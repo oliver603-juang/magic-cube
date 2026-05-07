@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>魔方掃描器 - 相機版</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Nunito',sans-serif;background:#111;color:#fff;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+.camera-wrap{position:relative;flex:1;overflow:hidden;background:#000}
+video{width:100%;height:100%;object-fit:cover}
+canvas#overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+canvas#sample{display:none}
+
+.hud{position:absolute;top:0;left:0;right:0;padding:16px;text-align:center;z-index:10}
+.hud .face-label{font-size:22px;font-weight:900;color:#FFD700;text-shadow:0 2px 8px rgba(0,0,0,0.8)}
+.hud .instruction{font-size:15px;color:#fff;margin-top:4px;text-shadow:0 1px 4px rgba(0,0,0,0.8)}
+.hud .progress-dots{display:flex;justify-content:center;gap:8px;margin-top:10px}
+.hud .dot{width:28px;height:6px;border-radius:3px;background:rgba(255,255,255,0.2)}
+.hud .dot.done{background:#00D2FF}
+.hud .dot.active{background:#FFD700;width:40px}
+
+.status-bar{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.85))}
+.status-bar .motion-indicator{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px}
+.status-bar .motion-dot{width:12px;height:12px;border-radius:50%;transition:all 0.3s}
+.status-bar .motion-dot.moving{background:#E94560;box-shadow:0 0 8px #E94560}
+.status-bar .motion-dot.still{background:#00D2FF;box-shadow:0 0 12px #00D2FF}
+.status-bar .motion-dot.capturing{background:#FFD700;box-shadow:0 0 16px #FFD700;animation:pulse 0.5s infinite}
+.status-bar .motion-text{font-size:13px;color:rgba(255,255,255,0.7)}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
+
+.detected-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:120px;margin:0 auto 10px}
+.detected-cell{height:32px;border-radius:6px;border:2px solid rgba(255,255,255,0.3)}
+
+.btn-row{display:flex;gap:8px;justify-content:center}
+.btn{padding:12px 24px;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer}
+.btn-confirm{background:#00D2FF;color:#000}
+.btn-retry{background:rgba(255,255,255,0.15);color:#fff}
+.btn-start{background:#FFD700;color:#000;font-size:18px;padding:16px 40px}
+
+/* Confirm/edit modal */
+.confirm-panel{display:none;position:absolute;bottom:0;left:0;right:0;background:rgba(16,21,38,0.95);border-radius:20px 20px 0 0;padding:20px;z-index:20}
+.confirm-panel.show{display:block}
+.confirm-panel h3{text-align:center;font-size:18px;margin-bottom:12px}
+.confirm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:180px;margin:0 auto 16px}
+.confirm-cell{height:52px;border-radius:10px;border:2px solid rgba(255,255,255,0.2);cursor:pointer;transition:all 0.15s}
+.confirm-cell:active{transform:scale(0.92)}
+.confirm-cell.center-cell{border-style:dashed;opacity:0.7}
+.color-picker{display:flex;gap:8px;justify-content:center;margin-bottom:16px}
+.color-opt{width:36px;height:36px;border-radius:10px;border:3px solid transparent;cursor:pointer}
+.color-opt.sel{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.4);transform:scale(1.1)}
+
+/* Start screen */
+.start-screen{position:absolute;inset:0;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;gap:16px}
+.start-screen h1{font-size:32px;font-weight:900;background:linear-gradient(135deg,#E94560,#00D2FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.start-screen p{color:rgba(255,255,255,0.6);font-size:14px;max-width:280px;text-align:center;line-height:1.6}
+
+/* Rotation guide overlay */
+.rotate-guide{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.7);z-index:25;flex-direction:column;align-items:center;justify-content:center}
+.rotate-guide.show{display:flex}
+.rotate-guide .arrow-icon{font-size:64px;animation:rotateHint 1.5s ease-in-out infinite}
+.rotate-guide .guide-text{font-size:18px;font-weight:800;margin-top:12px;color:#FFD700}
+.rotate-guide .guide-sub{font-size:14px;color:rgba(255,255,255,0.6);margin-top:4px}
+.rotate-guide .btn{margin-top:20px}
+@keyframes rotateHint{0%,100%{transform:rotate(0deg)}50%{transform:rotate(15deg)}}
+</style>
+</head>
+<body>
+
+<div class="camera-wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="overlay"></canvas>
+  <canvas id="sample"></canvas>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="face-label" id="faceLabel">準備掃描</div>
+    <div class="instruction" id="instruction">將魔方放在鏡頭前方 18cm</div>
+    <div class="progress-dots" id="progressDots"></div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar" id="statusBar" style="display:none">
+    <div class="motion-indicator">
+      <div class="motion-dot moving" id="motionDot"></div>
+      <div class="motion-text" id="motionText">偵測中...</div>
+    </div>
+    <div class="detected-grid" id="detectedGrid" style="display:none"></div>
+  </div>
+
+  <!-- Confirm panel -->
+  <div class="confirm-panel" id="confirmPanel">
+    <h3 id="confirmTitle">確認顏色</h3>
+    <div class="confirm-grid" id="confirmGrid"></div>
+    <div class="color-picker" id="colorPicker"></div>
+    <div class="btn-row">
+      <button class="btn btn-retry" onclick="retryFace()">重拍</button>
+      <button class="btn btn-confirm" onclick="confirmFace()">確認 ✓</button>
+    </div>
+  </div>
+
+  <!-- Rotation guide -->
+  <div class="rotate-guide" id="rotateGuide">
+    <div class="arrow-icon" id="rotateArrow">↻</div>
+    <div class="guide-text" id="rotateText">順時針轉 90°</div>
+    <div class="guide-sub" id="rotateSub">讓下一面對準鏡頭</div>
+    <button class="btn btn-confirm" onclick="startNextScan()">準備好了</button>
+  </div>
+
+  <!-- Start screen -->
+  <div class="start-screen" id="startScreen">
+    <h1>📷 魔方掃描器</h1>
+    <p>用後鏡頭掃描魔方 6 個面<br>白色朝上，紅色面對鏡頭<br>靜止不動就自動拍照</p>
+    <button class="btn btn-start" onclick="startCamera()">開始掃描</button>
+  </div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const SCAN_ORDER = [
+  {face:'F', color:'R', name:'前面（紅色中心）', guide:'白色朝上，紅色面對鏡頭'},
+  {face:'R', color:'B', name:'右面（藍色中心）', rotate:'順時針轉 90°（向右轉）', arrow:'↻'},
+  {face:'B', color:'O', name:'後面（橘色中心）', rotate:'再順時針轉 90°', arrow:'↻'},
+  {face:'L', color:'G', name:'左面（綠色中心）', rotate:'再順時針轉 90°', arrow:'↻'},
+  {face:'U', color:'W', name:'上面（白色中心）', rotate:'往後傾，讓頂面對鏡頭', arrow:'↶'},
+  {face:'D', color:'Y', name:'下面（黃色中心）', rotate:'往前傾 180°，讓底面對鏡頭', arrow:'↷'},
+];
+
+const COLOR_MAP = {
+  W:{hex:'#FFFFFF',name:'白'},R:{hex:'#B71234',name:'紅'},B:{hex:'#0046AD',name:'藍'},
+  O:{hex:'#FF5800',name:'橘'},G:{hex:'#009B48',name:'綠'},Y:{hex:'#FFD500',name:'黃'},
+};
+const CENTER_COLORS = {F:'R',R:'B',B:'O',L:'G',U:'W',D:'Y'};
+
+// ===== STATE =====
+let video, overlay, octx, sampleCanvas, sctx;
+let scanning = false;
+let currentScanIdx = 0;
+let prevFrame = null;
+let stillCount = 0;
+const STILL_THRESHOLD = 0.05; // 5% pixel diff = still
+const STILL_FRAMES_NEEDED = 4; // ~800ms at 200ms interval
+let detectionInterval = null;
+let scannedFaces = {}; // face -> [9 colors]
+let editColor = 'W';
+let editFaceColors = [];
+
+// ===== INIT =====
+function buildProgressDots() {
+  const el = document.getElementById('progressDots');
+  el.innerHTML = SCAN_ORDER.map((_,i) =>
+    `<div class="dot${i===0?' active':''}" id="dot-${i}"></div>`
+  ).join('');
+}
+
+async function startCamera() {
+  document.getElementById('startScreen').style.display = 'none';
+  video = document.getElementById('video');
+  overlay = document.getElementById('overlay');
+  octx = overlay.getContext('2d');
+  sampleCanvas = document.getElementById('sample');
+  sctx = sampleCanvas.getContext('2d');
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }
+    });
+    video.srcObject = stream;
+    await video.play();
+
+    // Match overlay to video
+    const vw = video.videoWidth || 720;
+    const vh = video.videoHeight || 1280;
+    overlay.width = vw;
+    overlay.height = vh;
+    sampleCanvas.width = 64;
+    sampleCanvas.height = 64;
+
+    buildProgressDots();
+    currentScanIdx = 0;
+    startScanFace();
+  } catch(e) {
+    alert('無法開啟相機: ' + e.message);
+  }
+}
+
+// ===== SCAN FACE =====
+function startScanFace() {
+  const info = SCAN_ORDER[currentScanIdx];
+  document.getElementById('faceLabel').textContent = info.name;
+  document.getElementById('instruction').textContent = info.guide || '對準魔方，靜止不動';
+  document.getElementById('statusBar').style.display = 'block';
+  document.getElementById('confirmPanel').classList.remove('show');
+  document.getElementById('detectedGrid').style.display = 'none';
+
+  // Update dots
+  SCAN_ORDER.forEach((_,i) => {
+    const dot = document.getElementById('dot-'+i);
+    if(!dot) return;
+    dot.className = 'dot' + (i < currentScanIdx ? ' done' : '') + (i === currentScanIdx ? ' active' : '');
+  });
+
+  scanning = true;
+  prevFrame = null;
+  stillCount = 0;
+  if(detectionInterval) clearInterval(detectionInterval);
+  detectionInterval = setInterval(detectMotion, 200);
+}
+
+// ===== MOTION DETECTION =====
+function detectMotion() {
+  if(!scanning || !video.videoWidth) return;
+
+  // Draw video frame to small canvas for comparison
+  sctx.drawImage(video, 0, 0, 64, 64);
+  const frame = sctx.getImageData(0, 0, 64, 64);
+
+  if(prevFrame) {
+    let diff = 0;
+    const total = frame.data.length / 4;
+    for(let i = 0; i < frame.data.length; i += 4) {
+      const dr = Math.abs(frame.data[i] - prevFrame.data[i]);
+      const dg = Math.abs(frame.data[i+1] - prevFrame.data[i+1]);
+      const db = Math.abs(frame.data[i+2] - prevFrame.data[i+2]);
+      if((dr + dg + db) / 3 > 20) diff++;
+    }
+    const diffRatio = diff / total;
+
+    const dot = document.getElementById('motionDot');
+    const txt = document.getElementById('motionText');
+
+    if(diffRatio < STILL_THRESHOLD) {
+      stillCount++;
+      if(stillCount >= STILL_FRAMES_NEEDED) {
+        dot.className = 'motion-dot capturing';
+        txt.textContent = '拍攝中...';
+        captureAndDetect();
+        return;
+      }
+      dot.className = 'motion-dot still';
+      txt.textContent = `靜止中... ${stillCount}/${STILL_FRAMES_NEEDED}`;
+    } else {
+      stillCount = 0;
+      dot.className = 'motion-dot moving';
+      txt.textContent = '請保持不動';
+    }
+  }
+  prevFrame = frame;
+
+  // Draw guide overlay
+  drawGuideOverlay();
+}
+
+// ===== GUIDE OVERLAY =====
+function drawGuideOverlay() {
+  const vw = overlay.width;
+  const vh = overlay.height;
+  octx.clearRect(0, 0, vw, vh);
+
+  // Draw 3x3 grid in center
+  const gridSize = Math.min(vw, vh) * 0.55;
+  const cellSize = gridSize / 3;
+  const startX = (vw - gridSize) / 2;
+  const startY = (vh - gridSize) / 2;
+
+  // Semi-transparent outside area
+  octx.fillStyle = 'rgba(0,0,0,0.3)';
+  octx.fillRect(0, 0, vw, startY);
+  octx.fillRect(0, startY + gridSize, vw, vh - startY - gridSize);
+  octx.fillRect(0, startY, startX, gridSize);
+  octx.fillRect(startX + gridSize, startY, vw - startX - gridSize, gridSize);
+
+  // Grid lines
+  octx.strokeStyle = 'rgba(255,215,0,0.6)';
+  octx.lineWidth = 2;
+  for(let i = 0; i <= 3; i++) {
+    // Vertical
+    octx.beginPath();
+    octx.moveTo(startX + i * cellSize, startY);
+    octx.lineTo(startX + i * cellSize, startY + gridSize);
+    octx.stroke();
+    // Horizontal
+    octx.beginPath();
+    octx.moveTo(startX, startY + i * cellSize);
+    octx.lineTo(startX + gridSize, startY + i * cellSize);
+    octx.stroke();
+  }
+
+  // Corner markers (thicker)
+  octx.strokeStyle = '#FFD700';
+  octx.lineWidth = 4;
+  const mk = 20;
+  [[startX,startY],[startX+gridSize,startY],[startX,startY+gridSize],[startX+gridSize,startY+gridSize]].forEach(([cx,cy])=>{
+    const dx = cx === startX ? 1 : -1;
+    const dy = cy === startY ? 1 : -1;
+    octx.beginPath();
+    octx.moveTo(cx + mk*dx, cy);
+    octx.lineTo(cx, cy);
+    octx.lineTo(cx, cy + mk*dy);
+    octx.stroke();
+  });
+
+  // Center crosshair
+  const ccx = startX + gridSize/2, ccy = startY + gridSize/2;
+  octx.strokeStyle = 'rgba(255,215,0,0.4)';
+  octx.lineWidth = 1;
+  octx.beginPath();
+  octx.moveTo(ccx - 10, ccy); octx.lineTo(ccx + 10, ccy);
+  octx.moveTo(ccx, ccy - 10); octx.lineTo(ccx, ccy + 10);
+  octx.stroke();
+
+  // Stillness ring
+  if(stillCount > 0) {
+    const progress = stillCount / STILL_FRAMES_NEEDED;
+    octx.strokeStyle = '#00D2FF';
+    octx.lineWidth = 3;
+    octx.beginPath();
+    octx.arc(ccx, ccy, gridSize/2 + 20, -Math.PI/2, -Math.PI/2 + progress * Math.PI * 2);
+    octx.stroke();
+  }
+}
+
+// ===== CAPTURE & COLOR DETECT =====
+function captureAndDetect() {
+  scanning = false;
+  if(detectionInterval) clearInterval(detectionInterval);
+
+  // Vibrate feedback
+  if(navigator.vibrate) navigator.vibrate(100);
+
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+
+  // Draw full frame to overlay for sampling
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = vw;
+  tempCanvas.height = vh;
+  const tctx = tempCanvas.getContext('2d');
+  tctx.drawImage(video, 0, 0, vw, vh);
+
+  // Sample 9 points from the 3x3 grid
+  const gridSize = Math.min(vw, vh) * 0.55;
+  const cellSize = gridSize / 3;
+  const startX = (vw - gridSize) / 2;
+  const startY = (vh - gridSize) / 2;
+
+  const faceInfo = SCAN_ORDER[currentScanIdx];
+  let colors = [];
+
+  for(let r = 0; r < 3; r++) {
+    for(let c = 0; c < 3; c++) {
+      const cx = Math.round(startX + (c + 0.5) * cellSize);
+      const cy = Math.round(startY + (r + 0.5) * cellSize);
+
+      // Sample 5x5 pixel area and average
+      const imgData = tctx.getImageData(cx - 2, cy - 2, 5, 5);
+      let rr = 0, gg = 0, bb = 0;
+      for(let i = 0; i < imgData.data.length; i += 4) {
+        rr += imgData.data[i]; gg += imgData.data[i+1]; bb += imgData.data[i+2];
+      }
+      const n = imgData.data.length / 4;
+      rr = rr/n; gg = gg/n; bb = bb/n;
+
+      const detected = classifyColor(rr, gg, bb);
+      colors.push(detected);
+    }
+  }
+
+  // Force center to be the expected center color
+  colors[4] = CENTER_COLORS[faceInfo.face];
+
+  editFaceColors = [...colors];
+  showConfirmPanel(colors);
+}
+
+// ===== HSV COLOR CLASSIFICATION =====
+function classifyColor(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0, s = max === 0 ? 0 : d / max, v = max;
+
+  if(d > 0) {
+    if(max === r) h = 60 * (((g - b) / d) % 6);
+    else if(max === g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+  }
+  if(h < 0) h += 360;
+
+  // Classify by HSV
+  // White: high V, low S
+  if(s < 0.2 && v > 0.6) return 'W';
+  // Yellow: H 40-70, high S, high V
+  if(h >= 40 && h < 75 && s > 0.3 && v > 0.5) return 'Y';
+  // Orange: H 10-40
+  if(h >= 10 && h < 40 && s > 0.4) return 'O';
+  // Red: H 0-10 or 340-360
+  if((h < 10 || h > 340) && s > 0.4) return 'R';
+  // Green: H 75-170
+  if(h >= 75 && h < 170 && s > 0.25) return 'G';
+  // Blue: H 170-260
+  if(h >= 170 && h < 260 && s > 0.25) return 'B';
+  // Fallback by brightness
+  if(v > 0.7 && s < 0.3) return 'W';
+  if(v > 0.5 && s > 0.5 && h > 40 && h < 80) return 'Y';
+  return 'W'; // default
+}
+
+// ===== CONFIRM PANEL =====
+function showConfirmPanel(colors) {
+  const panel = document.getElementById('confirmPanel');
+  panel.classList.add('show');
+
+  const info = SCAN_ORDER[currentScanIdx];
+  document.getElementById('confirmTitle').textContent = `確認 ${info.name}`;
+
+  buildConfirmGrid();
+  buildColorPicker();
+  document.getElementById('motionText').textContent = '已拍攝 ✓';
+  document.getElementById('motionDot').className = 'motion-dot still';
+}
+
+function buildConfirmGrid() {
+  const grid = document.getElementById('confirmGrid');
+  grid.innerHTML = '';
+  for(let i = 0; i < 9; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'confirm-cell' + (i === 4 ? ' center-cell' : '');
+    cell.style.background = COLOR_MAP[editFaceColors[i]].hex;
+    if(editFaceColors[i] === 'W' || editFaceColors[i] === 'Y') {
+      cell.style.borderColor = 'rgba(0,0,0,0.2)';
+    }
+    if(i !== 4) {
+      cell.onclick = () => {
+        editFaceColors[i] = editColor;
+        buildConfirmGrid();
+      };
+    } else {
+      cell.textContent = '⭐';
+      cell.style.display = 'flex';
+      cell.style.alignItems = 'center';
+      cell.style.justifyContent = 'center';
+      cell.style.fontSize = '18px';
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function buildColorPicker() {
+  const picker = document.getElementById('colorPicker');
+  picker.innerHTML = '';
+  Object.entries(COLOR_MAP).forEach(([k, v]) => {
+    const opt = document.createElement('div');
+    opt.className = 'color-opt' + (k === editColor ? ' sel' : '');
+    opt.style.background = v.hex;
+    if(k === 'W') opt.style.border = '3px solid #aaa';
+    opt.onclick = () => {
+      editColor = k;
+      document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('sel'));
+      opt.classList.add('sel');
+    };
+    picker.appendChild(opt);
+  });
+}
+
+function retryFace() {
+  document.getElementById('confirmPanel').classList.remove('show');
+  startScanFace();
+}
+
+function confirmFace() {
+  const info = SCAN_ORDER[currentScanIdx];
+  scannedFaces[info.face] = [...editFaceColors];
+
+  document.getElementById('confirmPanel').classList.remove('show');
+  currentScanIdx++;
+
+  if(currentScanIdx >= SCAN_ORDER.length) {
+    // All 6 faces scanned!
+    allFacesScanned();
+  } else {
+    // Show rotation guide
+    showRotateGuide();
+  }
+}
+
+// ===== ROTATION GUIDE =====
+function showRotateGuide() {
+  const info = SCAN_ORDER[currentScanIdx];
+  const guide = document.getElementById('rotateGuide');
+  guide.classList.add('show');
+  document.getElementById('rotateArrow').textContent = info.arrow || '↻';
+  document.getElementById('rotateText').textContent = info.rotate;
+  document.getElementById('rotateSub').textContent = `下一面：${info.name}`;
+}
+
+function startNextScan() {
+  document.getElementById('rotateGuide').classList.remove('show');
+  startScanFace();
+}
+
+// ===== ALL FACES SCANNED =====
+function allFacesScanned() {
+  document.getElementById('statusBar').style.display = 'none';
+  document.getElementById('faceLabel').textContent = '✅ 掃描完成！';
+  document.getElementById('instruction').textContent = '6 面資料已收集';
+
+  // Build facelet string
+  const FACE_ORDER = ['U','R','F','D','L','B'];
+  const COLOR_TO_FACE = {W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
+
+  let facelet = '';
+  FACE_ORDER.forEach(f => {
+    const colors = scannedFaces[f];
+    if(!colors) { facelet += '?????????'; return; }
+    colors.forEach(c => { facelet += COLOR_TO_FACE[c] || '?'; });
+  });
+
+  // Validate counts
+  const counts = {};
+  'URFDLB'.split('').forEach(c => counts[c] = 0);
+  for(const ch of facelet) counts[ch] = (counts[ch]||0) + 1;
+  const valid = Object.values(counts).every(v => v === 9) && !facelet.includes('?');
+
+  // Show result
+  let resultHTML = `<div style="text-align:center;padding:20px;">`;
+  resultHTML += `<h2 style="color:#FFD700;margin-bottom:12px;">掃描結果</h2>`;
+
+  if(valid) {
+    resultHTML += `<p style="color:#00D2FF;font-size:16px;margin-bottom:8px;">✅ 顏色數量正確！</p>`;
+    resultHTML += `<p style="color:rgba(255,255,255,0.6);font-size:13px;word-break:break-all;">Facelet: ${facelet}</p>`;
+    resultHTML += `<button class="btn btn-confirm" style="margin-top:16px" onclick="copySolve('${facelet}')">複製到解題器</button>`;
+  } else {
+    resultHTML += `<p style="color:#E94560;font-size:14px;">顏色數量不對，請重新掃描</p>`;
+    resultHTML += `<pre style="font-size:11px;color:rgba(255,255,255,0.5)">${JSON.stringify(counts)}</pre>`;
+    resultHTML += `<button class="btn btn-retry" style="margin-top:12px" onclick="location.reload()">重新開始</button>`;
+  }
+  resultHTML += `</div>`;
+
+  const panel = document.getElementById('confirmPanel');
+  panel.innerHTML = resultHTML;
+  panel.classList.add('show');
+}
+
+function copySolve(facelet) {
+  // Copy facelet to clipboard
+  navigator.clipboard.writeText(facelet).then(() => {
+    alert('已複製 facelet 字串！\n\n' + facelet + '\n\n可以貼到魔方小老師解題器');
+  }).catch(() => {
+    prompt('複製這個字串到解題器：', facelet);
+  });
+}
+
+// ===== KEEP SCREEN ON =====
+let wakeLock = null;
+async function requestWakeLock() {
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
+}
+requestWakeLock();
+</script>
+</body>
+</html>
