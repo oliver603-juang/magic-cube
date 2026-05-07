@@ -42,15 +42,15 @@ canvas#sample{display:none}
 .btn-start{background:#FFD700;color:#000;font-size:18px;padding:16px 40px}
 
 /* Confirm/edit modal */
-.confirm-panel{display:none;position:absolute;bottom:0;left:0;right:0;background:rgba(16,21,38,0.95);border-radius:20px 20px 0 0;padding:20px;z-index:20}
+.confirm-panel{display:none;position:absolute;bottom:0;left:0;right:0;background:rgba(16,21,38,0.97);border-radius:20px 20px 0 0;padding:16px 16px 24px;z-index:20;max-height:55vh;overflow-y:auto}
 .confirm-panel.show{display:block}
-.confirm-panel h3{text-align:center;font-size:18px;margin-bottom:12px}
-.confirm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:180px;margin:0 auto 16px}
-.confirm-cell{height:52px;border-radius:10px;border:2px solid rgba(255,255,255,0.2);cursor:pointer;transition:all 0.15s}
+.confirm-panel h3{text-align:center;font-size:17px;margin-bottom:10px}
+.confirm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:160px;margin:0 auto 12px}
+.confirm-cell{height:46px;border-radius:10px;border:2px solid rgba(255,255,255,0.2);cursor:pointer;transition:all 0.15s}
 .confirm-cell:active{transform:scale(0.92)}
 .confirm-cell.center-cell{border-style:dashed;opacity:0.7}
-.color-picker{display:flex;gap:8px;justify-content:center;margin-bottom:16px}
-.color-opt{width:36px;height:36px;border-radius:10px;border:3px solid transparent;cursor:pointer}
+.color-picker{display:flex;gap:6px;justify-content:center;margin-bottom:12px}
+.color-opt{width:32px;height:32px;border-radius:8px;border:3px solid transparent;cursor:pointer}
 .color-opt.sel{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.4);transform:scale(1.1)}
 
 /* Start screen */
