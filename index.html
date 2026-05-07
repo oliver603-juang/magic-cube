@@ -107,7 +107,7 @@ const C2F={W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
 
 let vid,ov,octx,sm,sctx;
 let scanning=false, idx=0, prevF=null, still=0;
-let intv=null, faces={}, refs={};
+let intv=null, faces={}, refs={}, rawData={};
 const STILL_TH=0.05, STILL_N=8; // 8 frames × 200ms = 1.6 sec
 
 function mkDots(){
@@ -247,120 +247,111 @@ function capture(){
   const sx=(vw-gs)/2,sy=(vh-gs)/2;
   const info=SCAN[idx];
 
-  let colors=[], rgbs=[];
+  let rgbs=[];
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){
     const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
     const d=tctx.getImageData(px-5,py-5,11,11);
     let rr=0,gg=0,bb=0;
     for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
     const n=d.data.length/4;
-    rr=Math.round(rr/n);gg=Math.round(gg/n);bb=Math.round(bb/n);
-    rgbs.push([rr,gg,bb]);
-    colors.push(classify(rr,gg,bb));
+    rgbs.push([Math.round(rr/n),Math.round(gg/n),Math.round(bb/n)]);
   }
 
-  // Calibrate: center pixel = known color
-  const known=CC[info.f];
-  colors[4]=known;
-  refs[known]=rgbs[4];
+  rawData[info.f]=rgbs;
 
-  // Re-classify with updated refs
-  for(let i=0;i<9;i++){
-    if(i===4)continue;
-    colors[i]=classify(rgbs[i][0],rgbs[i][1],rgbs[i][2]);
-  }
-  colors[4]=known;
-
-  // Show detected colors
+  // Show raw RGB preview
   const dg=document.getElementById('dg');
   dg.style.display='grid';
-  dg.innerHTML=colors.map((col,i)=>
-    `<div class="det-cell" style="background:${CMAP[col]}">${i===4?'⭐':col}</div>`
+  dg.innerHTML=rgbs.map(([r,g,b],i)=>
+    `<div class="det-cell" style="background:rgb(${r},${g},${b})">${i===4?'⭐':''}</div>`
   ).join('');
-  document.getElementById('sts').textContent='✅ 已拍攝';
-  document.getElementById('dbg').textContent=`RGB: ${rgbs.map(([r,g,b])=>`${r},${g},${b}`).join(' | ')}`;
+  document.getElementById('sts').textContent=`✅ ${info.name} 已拍攝`;
 
-  // Store face
-  faces[info.f]=[...colors];
-
-  // Auto-advance after brief pause
   setTimeout(()=>{
     idx++;
-    if(idx>=SCAN.length){showResult();}
-    else{showRotate();}
+    if(idx>=SCAN.length){ globalClassify(); }
+    else{ showRotate(); }
   }, 800);
 }
 
-// Color classification
-function cdist(r1,g1,b1,r2,g2,b2){
-  // Use a perceptual color distance that better separates orange/red
-  // Key insight from test data: O=(255,50,48) vs R=(152,0,42)
-  // The main difference is in R channel (255 vs 152) and G channel (50 vs 0)
-  // Standard weighted Euclidean with extra G weight helps
-  const dr=r1-r2, dg=g1-g2, db=b1-b2;
-  // Also add a hue-based penalty for colors in the red/orange zone
-  return Math.sqrt(dr*dr*3 + dg*dg*6 + db*db*2);
-}
+// ===== GLOBAL CLASSIFICATION =====
+function globalClassify(){
+  document.getElementById('sts').textContent='分析 54 色塊中...';
+  const FO=['U','R','F','D','L','B'];
 
-function classify(r,g,b){
-  const entries=Object.entries(refs);
-  if(entries.length>=3){
-    let best=null,bd=Infinity;
-    entries.forEach(([c,[rr,gg,bb]])=>{
-      const d=cdist(r,g,b,rr,gg,bb);
-      if(d<bd){bd=d;best=c;}
+  // Collect all 54 stickers
+  const all=[];
+  FO.forEach(f=>{
+    const rgbs=rawData[f];
+    if(!rgbs)return;
+    for(let i=0;i<9;i++) all.push({face:f,pos:i,rgb:rgbs[i],color:null});
+  });
+
+  if(all.length!==54){showResult(false);return;}
+
+  // 6 anchors from center stickers (pos=4)
+  const anchors={};
+  FO.forEach(f=>{ anchors[CC[f]]=rawData[f][4]; });
+
+  // Fix centers
+  all.forEach(s=>{ if(s.pos===4) s.color=CC[s.face]; });
+
+  // Compute distance from each non-center to each anchor
+  const nonC=all.filter(s=>s.pos!==4);
+  nonC.forEach(s=>{
+    s.dists={};
+    Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{
+      const [r,g,b]=s.rgb;
+      s.dists[c]=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);
     });
-    if(best)return best;
-  }
-  // Fallback HSV
-  const rf=r/255,gf=g/255,bf=b/255;
-  const mx=Math.max(rf,gf,bf),mn=Math.min(rf,gf,bf),d=mx-mn;
-  let h=0,s=mx===0?0:d/mx,v=mx;
-  if(d>0){
-    if(mx===rf)h=60*(((gf-bf)/d+6)%6);
-    else if(mx===gf)h=60*((bf-rf)/d+2);
-    else h=60*((rf-gf)/d+4);
-  }
-  if(s<0.18&&v>0.5)return 'W';
-  if(h>=35&&h<80&&s>0.2&&v>0.4)return 'Y';
-  if(h>=12&&h<35&&s>0.3)return 'O';
-  if((h<12||h>335)&&s>0.3)return 'R';
-  if(h>=80&&h<170&&s>0.15)return 'G';
-  if(h>=170&&h<270&&s>0.15)return 'B';
-  return v>0.6?'W':'Y';
-}
+  });
 
-// Rotation guide with auto-countdown
-function showRotate(){
-  const info=SCAN[idx];
-  const ov=document.getElementById('rotOv');
-  ov.classList.add('show');
-  document.getElementById('rotIcon').textContent=info.arrow||'↻';
-  document.getElementById('rotTxt').textContent=info.rot;
-  document.getElementById('rotSub').textContent=`下一面：${info.name}`;
-  let cd=3;
-  document.getElementById('rotCD').textContent=cd;
-  const ci=setInterval(()=>{
-    cd--;
-    if(cd<=0){
-      clearInterval(ci);
-      ov.classList.remove('show');
-      startScan();
-    }else{
-      document.getElementById('rotCD').textContent=cd;
-    }
-  },1000);
+  // Greedy assignment: most confident first, each color max 9
+  const cnt={W:1,R:1,B:1,O:1,G:1,Y:1};
+
+  // Build flat list of (sticker, color, distance) sorted by distance
+  const candidates=[];
+  nonC.forEach(s=>{
+    Object.entries(s.dists).forEach(([c,d])=>{
+      candidates.push({s,c,d});
+    });
+  });
+  candidates.sort((a,b)=>a.d-b.d);
+
+  // Assign greedily
+  candidates.forEach(({s,c,d})=>{
+    if(s.color) return; // already assigned
+    if(cnt[c]>=9) return; // color full
+    s.color=c;
+    cnt[c]++;
+  });
+
+  // Safety: assign any remaining
+  nonC.filter(s=>!s.color).forEach(s=>{
+    const avail=Object.entries(cnt).find(([c,n])=>n<9);
+    if(avail){s.color=avail[0];cnt[avail[0]]++;}
+  });
+
+  // Build faces
+  FO.forEach(f=>{
+    faces[f]=all.filter(s=>s.face===f).sort((a,b)=>a.pos-b.pos).map(s=>s.color);
+  });
+
+  const anchorStr=Object.entries(anchors).map(([c,[r,g,b]])=>`${c}=(${r},${g},${b})`).join(' ');
+  showResult(true, anchorStr);
 }
 
 // Result screen
-function showResult(){
+function showResult(dataOk, extra){
   document.getElementById('bot').style.display='none';
   const rs=document.getElementById('resultScr');
   rs.classList.add('show');
 
+  const FO=['U','R','F','D','L','B'];
+
   // Build facelet
   let fl='';
-  ['U','R','F','D','L','B'].forEach(f=>{
+  FO.forEach(f=>{
     const c=faces[f];
     if(!c){fl+='?????????';return;}
     c.forEach(x=>fl+=C2F[x]||'?');
@@ -373,7 +364,7 @@ function showResult(){
   // Face previews
   const fp=document.getElementById('resFaces');
   fp.innerHTML='';
-  ['U','R','F','D','L','B'].forEach(f=>{
+  FO.forEach(f=>{
     const c=faces[f];
     if(!c)return;
     const d=document.createElement('div');
@@ -383,24 +374,20 @@ function showResult(){
 
   if(ok){
     document.getElementById('resTitle').textContent='✅ 掃描成功！';
-    document.getElementById('resMsg').innerHTML=`<span style="color:#00D2FF">顏色數量正確</span>`;
-    document.getElementById('resData').textContent=fl;
+    document.getElementById('resMsg').innerHTML=`<span style="color:#00D2FF">每色 9 格 ✓</span>`;
+    document.getElementById('resData').textContent=fl+(extra?'\n'+extra:'');
     document.getElementById('resBtn').textContent='複製 Facelet';
     document.getElementById('resBtn').onclick=()=>{
       navigator.clipboard.writeText(fl).catch(()=>{});
       alert('已複製！\n'+fl);
     };
   }else{
-    document.getElementById('resTitle').textContent='⚠️ 顏色不對';
-    document.getElementById('resMsg').innerHTML=`<span style="color:#E94560">數量: ${JSON.stringify(cnt)}</span>`;
-    document.getElementById('resData').textContent=fl;
+    document.getElementById('resTitle').textContent='⚠️ 數量異常';
+    document.getElementById('resMsg').innerHTML=`<span style="color:#E94560">${JSON.stringify(cnt)}</span>`;
+    document.getElementById('resData').textContent=fl+(extra?'\n'+extra:'');
     document.getElementById('resBtn').textContent='重新開始';
     document.getElementById('resBtn').onclick=()=>location.reload();
   }
-
-  // Debug: show all ref colors
-  const refInfo=Object.entries(refs).map(([c,[r,g,b]])=>`${c}=(${r},${g},${b})`).join(' ');
-  document.getElementById('resData').textContent+='\nRefs: '+refInfo;
 }
 
 // Wake lock
