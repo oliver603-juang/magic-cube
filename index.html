@@ -350,64 +350,107 @@ function captureAndDetect() {
 
   const faceInfo = SCAN_ORDER[currentScanIdx];
   let colors = [];
+  let centerRGB = null;
 
   for(let r = 0; r < 3; r++) {
     for(let c = 0; c < 3; c++) {
       const cx = Math.round(startX + (c + 0.5) * cellSize);
       const cy = Math.round(startY + (r + 0.5) * cellSize);
 
-      // Sample 5x5 pixel area and average
-      const imgData = tctx.getImageData(cx - 2, cy - 2, 5, 5);
+      // Sample 7x7 pixel area and average
+      const imgData = tctx.getImageData(cx - 3, cy - 3, 7, 7);
       let rr = 0, gg = 0, bb = 0;
       for(let i = 0; i < imgData.data.length; i += 4) {
         rr += imgData.data[i]; gg += imgData.data[i+1]; bb += imgData.data[i+2];
       }
       const n = imgData.data.length / 4;
-      rr = rr/n; gg = gg/n; bb = bb/n;
+      rr = Math.round(rr/n); gg = Math.round(gg/n); bb = Math.round(bb/n);
+
+      // Save center pixel for calibration
+      if(r === 1 && c === 1) {
+        centerRGB = [rr, gg, bb];
+      }
 
       const detected = classifyColor(rr, gg, bb);
       colors.push(detected);
     }
   }
 
-  // Force center to be the expected center color
-  colors[4] = CENTER_COLORS[faceInfo.face];
+  // Force center to known color and store as reference
+  const knownCenter = CENTER_COLORS[faceInfo.face];
+  colors[4] = knownCenter;
+  if(centerRGB) {
+    refColors[knownCenter] = centerRGB;
+    console.log(`Calibrated ${knownCenter}:`, centerRGB);
+  }
+
+  // Re-classify all non-center stickers using updated references
+  for(let r = 0; r < 3; r++) {
+    for(let c = 0; c < 3; c++) {
+      if(r === 1 && c === 1) continue;
+      const cx2 = Math.round(startX + (c + 0.5) * cellSize);
+      const cy2 = Math.round(startY + (r + 0.5) * cellSize);
+      const imgData2 = tctx.getImageData(cx2 - 3, cy2 - 3, 7, 7);
+      let rr2=0,gg2=0,bb2=0;
+      for(let i=0;i<imgData2.data.length;i+=4){rr2+=imgData2.data[i];gg2+=imgData2.data[i+1];bb2+=imgData2.data[i+2];}
+      const n2=imgData2.data.length/4;
+      colors[r*3+c] = classifyColor(Math.round(rr2/n2), Math.round(gg2/n2), Math.round(bb2/n2));
+    }
+  }
+  colors[4] = knownCenter; // ensure center stays correct
 
   editFaceColors = [...colors];
   showConfirmPanel(colors);
 }
 
-// ===== HSV COLOR CLASSIFICATION =====
+// ===== COLOR CLASSIFICATION =====
+// Instead of fixed HSV thresholds, we use the 6 known center colors
+// as calibration references. After scanning each face, the center pixel
+// gives us the ground-truth RGB for that color under current lighting.
+
+// Collected reference colors (RGB) from center pixels
+let refColors = {}; // e.g., {R: [180, 20, 30], B: [20, 40, 160], ...}
+
+function colorDistance(r1,g1,b1, r2,g2,b2) {
+  // Weighted Euclidean distance (human eye is more sensitive to green)
+  const dr=r1-r2, dg=g1-g2, db=b1-b2;
+  return Math.sqrt(dr*dr*2 + dg*dg*4 + db*db*3);
+}
+
 function classifyColor(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const d = max - min;
-  let h = 0, s = max === 0 ? 0 : d / max, v = max;
-
-  if(d > 0) {
-    if(max === r) h = 60 * (((g - b) / d) % 6);
-    else if(max === g) h = 60 * ((b - r) / d + 2);
-    else h = 60 * ((r - g) / d + 4);
+  // If we have reference colors, use nearest-neighbor
+  const refs = Object.entries(refColors);
+  if(refs.length >= 4) {
+    let best = null, bestDist = Infinity;
+    refs.forEach(([color, [rr,gg,bb]]) => {
+      const d = colorDistance(r,g,b, rr,gg,bb);
+      if(d < bestDist) { bestDist = d; best = color; }
+    });
+    if(best) return best;
   }
-  if(h < 0) h += 360;
 
-  // Classify by HSV
-  // White: high V, low S
-  if(s < 0.2 && v > 0.6) return 'W';
-  // Yellow: H 40-70, high S, high V
-  if(h >= 40 && h < 75 && s > 0.3 && v > 0.5) return 'Y';
-  // Orange: H 10-40
-  if(h >= 10 && h < 40 && s > 0.4) return 'O';
-  // Red: H 0-10 or 340-360
-  if((h < 10 || h > 340) && s > 0.4) return 'R';
-  // Green: H 75-170
-  if(h >= 75 && h < 170 && s > 0.25) return 'G';
-  // Blue: H 170-260
-  if(h >= 170 && h < 260 && s > 0.25) return 'B';
-  // Fallback by brightness
-  if(v > 0.7 && s < 0.3) return 'W';
-  if(v > 0.5 && s > 0.5 && h > 40 && h < 80) return 'Y';
-  return 'W'; // default
+  // Fallback: HSV classification (used for first few faces before calibration)
+  return classifyByHSV(r, g, b);
+}
+
+function classifyByHSV(r, g, b) {
+  const rf=r/255, gf=g/255, bf=b/255;
+  const max=Math.max(rf,gf,bf), min=Math.min(rf,gf,bf), d=max-min;
+  let h=0, s=max===0?0:d/max, v=max;
+  if(d>0){
+    if(max===rf) h=60*(((gf-bf)/d+6)%6);
+    else if(max===gf) h=60*((bf-rf)/d+2);
+    else h=60*((rf-gf)/d+4);
+  }
+
+  if(s<0.18 && v>0.55) return 'W';
+  if(h>=40 && h<80 && s>0.25 && v>0.45) return 'Y';
+  if(h>=14 && h<40 && s>0.35) return 'O';
+  if((h<14||h>335) && s>0.35) return 'R';
+  if(h>=80 && h<170 && s>0.2) return 'G';
+  if(h>=170 && h<265 && s>0.2) return 'B';
+  if(v>0.65) return 'W';
+  return 'Y';
 }
 
 // ===== CONFIRM PANEL =====
