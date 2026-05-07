@@ -206,30 +206,6 @@ function drawOv(){
     octx.arc(ccx,ccy,gs/2+15,-Math.PI/2,-Math.PI/2+prog*Math.PI*2);
     octx.stroke();
   }
-
-  // Show live color sample dots
-  if(vid.videoWidth){
-    const tc=document.createElement('canvas');
-    tc.width=vw;tc.height=vh;
-    const tctx=tc.getContext('2d');
-    tctx.drawImage(vid,0,0,vw,vh);
-    for(let r=0;r<3;r++)for(let c=0;c<3;c++){
-      const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
-      const d=tctx.getImageData(px-2,py-2,5,5);
-      let rr=0,gg=0,bb=0;
-      for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
-      const n=d.data.length/4;
-      rr=Math.round(rr/n);gg=Math.round(gg/n);bb=Math.round(bb/n);
-      // Small color dot
-      octx.beginPath();
-      octx.arc(px,py,8,0,Math.PI*2);
-      octx.fillStyle=`rgb(${rr},${gg},${bb})`;
-      octx.fill();
-      octx.strokeStyle='rgba(255,255,255,0.6)';
-      octx.lineWidth=1.5;
-      octx.stroke();
-    }
-  }
 }
 
 function capture(){
@@ -265,12 +241,17 @@ function capture(){
   dg.innerHTML=rgbs.map(([r,g,b],i)=>
     `<div class="det-cell" style="background:rgb(${r},${g},${b})">${i===4?'⭐':''}</div>`
   ).join('');
-  document.getElementById('sts').textContent=`✅ ${info.name} 已拍攝`;
+  document.getElementById('sts').textContent=`✅ ${info.name} 已拍攝 (${idx+1}/6)`;
 
   setTimeout(()=>{
-    idx++;
-    if(idx>=SCAN.length){ globalClassify(); }
-    else{ showRotate(); }
+    try{
+      idx++;
+      if(idx>=SCAN.length){ globalClassify(); }
+      else{ showRotate(); }
+    }catch(e){
+      document.getElementById('sts').textContent='錯誤: '+e.message;
+      console.error(e);
+    }
   }, 800);
 }
 
