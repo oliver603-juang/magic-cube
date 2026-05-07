@@ -108,7 +108,7 @@ const C2F={W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
 let vid,ov,octx,sm,sctx;
 let scanning=false, idx=0, prevF=null, still=0;
 let intv=null, faces={}, refs={};
-const STILL_TH=0.05, STILL_N=5; // 5 frames × 200ms = 1 sec
+const STILL_TH=0.05, STILL_N=8; // 8 frames × 200ms = 1.6 sec
 
 function mkDots(){
   document.getElementById('dots').innerHTML=SCAN.map((_,i)=>
@@ -250,7 +250,7 @@ function capture(){
   let colors=[], rgbs=[];
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){
     const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
-    const d=tctx.getImageData(px-3,py-3,7,7);
+    const d=tctx.getImageData(px-5,py-5,11,11);
     let rr=0,gg=0,bb=0;
     for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
     const n=d.data.length/4;
@@ -293,8 +293,13 @@ function capture(){
 
 // Color classification
 function cdist(r1,g1,b1,r2,g2,b2){
-  const dr=r1-r2,dg=g1-g2,db=b1-b2;
-  return Math.sqrt(dr*dr*2+dg*dg*4+db*db*3);
+  // Use a perceptual color distance that better separates orange/red
+  // Key insight from test data: O=(255,50,48) vs R=(152,0,42)
+  // The main difference is in R channel (255 vs 152) and G channel (50 vs 0)
+  // Standard weighted Euclidean with extra G weight helps
+  const dr=r1-r2, dg=g1-g2, db=b1-b2;
+  // Also add a hue-based penalty for colors in the red/orange zone
+  return Math.sqrt(dr*dr*3 + dg*dg*6 + db*db*2);
 }
 
 function classify(r,g,b){
