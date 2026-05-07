@@ -4,606 +4,402 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>魔方掃描器 - 相機版</title>
+<title>魔方掃描器 v3</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:'Nunito',sans-serif;background:#111;color:#fff;height:100vh;overflow:hidden;display:flex;flex-direction:column}
-
-.camera-wrap{position:relative;flex:1;overflow:hidden;background:#000}
+body{font-family:'Nunito',sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+.cam{position:relative;flex:1;overflow:hidden}
 video{width:100%;height:100%;object-fit:cover}
-canvas#overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
-canvas#sample{display:none}
+canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+canvas#sm{display:none}
 
-.hud{position:absolute;top:0;left:0;right:0;padding:16px;text-align:center;z-index:10}
-.hud .face-label{font-size:22px;font-weight:900;color:#FFD700;text-shadow:0 2px 8px rgba(0,0,0,0.8)}
-.hud .instruction{font-size:15px;color:#fff;margin-top:4px;text-shadow:0 1px 4px rgba(0,0,0,0.8)}
-.hud .progress-dots{display:flex;justify-content:center;gap:8px;margin-top:10px}
-.hud .dot{width:28px;height:6px;border-radius:3px;background:rgba(255,255,255,0.2)}
-.hud .dot.done{background:#00D2FF}
-.hud .dot.active{background:#FFD700;width:40px}
+.hud{position:absolute;top:0;left:0;right:0;padding:12px 16px;text-align:center;z-index:10;background:linear-gradient(rgba(0,0,0,0.7),transparent);padding-bottom:30px}
+.face-lbl{font-size:20px;font-weight:900;color:#FFD700;text-shadow:0 2px 6px rgba(0,0,0,0.9)}
+.inst{font-size:14px;color:#eee;margin-top:2px;text-shadow:0 1px 4px rgba(0,0,0,0.8)}
+.dots{display:flex;justify-content:center;gap:6px;margin-top:8px}
+.dot{width:24px;height:5px;border-radius:3px;background:rgba(255,255,255,0.2)}
+.dot.done{background:#00D2FF}
+.dot.active{background:#FFD700;width:36px}
 
-.status-bar{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.85))}
-.status-bar .motion-indicator{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px}
-.status-bar .motion-dot{width:12px;height:12px;border-radius:50%;transition:all 0.3s}
-.status-bar .motion-dot.moving{background:#E94560;box-shadow:0 0 8px #E94560}
-.status-bar .motion-dot.still{background:#00D2FF;box-shadow:0 0 12px #00D2FF}
-.status-bar .motion-dot.capturing{background:#FFD700;box-shadow:0 0 16px #FFD700;animation:pulse 0.5s infinite}
-.status-bar .motion-text{font-size:13px;color:rgba(255,255,255,0.7)}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
+.bot{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:10px 12px;background:linear-gradient(transparent,rgba(0,0,0,0.8));padding-top:30px}
+.det-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;width:100px;margin:0 auto 6px}
+.det-cell{height:28px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.3);font-size:8px;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,0.6);font-weight:700}
+.status{text-align:center;font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:4px}
+.debug{font-size:9px;color:rgba(255,255,255,0.35);text-align:center;word-break:break-all;max-height:40px;overflow:hidden}
 
-.detected-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:120px;margin:0 auto 10px}
-.detected-cell{height:32px;border-radius:6px;border:2px solid rgba(255,255,255,0.3)}
+.rotate-ov{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.75);z-index:25;flex-direction:column;align-items:center;justify-content:center}
+.rotate-ov.show{display:flex}
+.rotate-ov .icon{font-size:60px;animation:rh 1.5s ease-in-out infinite}
+.rotate-ov .txt{font-size:20px;font-weight:800;margin-top:10px;color:#FFD700}
+.rotate-ov .sub{font-size:14px;color:rgba(255,255,255,0.6);margin-top:4px}
+.rotate-ov .countdown{font-size:48px;font-weight:900;color:#00D2FF;margin-top:16px}
+@keyframes rh{0%,100%{transform:rotate(0deg)}50%{transform:rotate(15deg)}}
 
-.btn-row{display:flex;gap:8px;justify-content:center}
-.btn{padding:12px 24px;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer}
-.btn-confirm{background:#00D2FF;color:#000}
-.btn-retry{background:rgba(255,255,255,0.15);color:#fff}
-.btn-start{background:#FFD700;color:#000;font-size:18px;padding:16px 40px}
+.start{position:absolute;inset:0;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;gap:12px}
+.start h1{font-size:28px;font-weight:900;color:#FFD700}
+.start p{color:rgba(255,255,255,0.6);font-size:13px;max-width:280px;text-align:center;line-height:1.5}
+.btn{padding:14px 32px;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:16px;cursor:pointer;background:#FFD700;color:#000}
 
-/* Confirm/edit modal */
-.confirm-panel{display:none;position:absolute;top:0;left:0;right:0;background:rgba(16,21,38,0.97);border-radius:0 0 20px 20px;padding:12px 16px 16px;z-index:20}
-.confirm-panel.show{display:block}
-.confirm-panel h3{text-align:center;font-size:17px;margin-bottom:10px}
-.confirm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:160px;margin:0 auto 12px}
-.confirm-cell{height:46px;border-radius:10px;border:2px solid rgba(255,255,255,0.2);cursor:pointer;transition:all 0.15s}
-.confirm-cell:active{transform:scale(0.92)}
-.confirm-cell.center-cell{border-style:dashed;opacity:0.7}
-.color-picker{display:flex;gap:6px;justify-content:center;margin-bottom:12px}
-.color-opt{width:32px;height:32px;border-radius:8px;border:3px solid transparent;cursor:pointer}
-.color-opt.sel{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,0.4);transform:scale(1.1)}
-
-/* Start screen */
-.start-screen{position:absolute;inset:0;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;gap:16px}
-.start-screen h1{font-size:32px;font-weight:900;background:linear-gradient(135deg,#E94560,#00D2FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.start-screen p{color:rgba(255,255,255,0.6);font-size:14px;max-width:280px;text-align:center;line-height:1.6}
-
-/* Rotation guide overlay */
-.rotate-guide{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.7);z-index:25;flex-direction:column;align-items:center;justify-content:center}
-.rotate-guide.show{display:flex}
-.rotate-guide .arrow-icon{font-size:64px;animation:rotateHint 1.5s ease-in-out infinite}
-.rotate-guide .guide-text{font-size:18px;font-weight:800;margin-top:12px;color:#FFD700}
-.rotate-guide .guide-sub{font-size:14px;color:rgba(255,255,255,0.6);margin-top:4px}
-.rotate-guide .btn{margin-top:20px}
-@keyframes rotateHint{0%,100%{transform:rotate(0deg)}50%{transform:rotate(15deg)}}
+.result{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.9);z-index:30;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.result.show{display:flex}
+.result h2{font-size:24px;font-weight:900;color:#FFD700;margin-bottom:8px}
+.result .msg{font-size:15px;margin-bottom:12px;text-align:center}
+.result .data{font-size:10px;color:rgba(255,255,255,0.4);word-break:break-all;margin-bottom:16px;text-align:center}
+.result .face-preview{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
+.result .mini-face{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:54px}
+.result .mini-face .mc{width:16px;height:16px;border-radius:2px}
+.result .face-title{font-size:10px;text-align:center;color:rgba(255,255,255,0.5);margin-bottom:2px}
 </style>
 </head>
 <body>
+<div class="cam">
+  <video id="vid" autoplay playsinline muted></video>
+  <canvas id="ov"></canvas>
+  <canvas id="sm"></canvas>
 
-<div class="camera-wrap">
-  <video id="video" autoplay playsinline muted></video>
-  <canvas id="overlay"></canvas>
-  <canvas id="sample"></canvas>
-
-  <!-- HUD -->
   <div class="hud">
-    <div class="face-label" id="faceLabel">準備掃描</div>
-    <div class="instruction" id="instruction">將魔方放在鏡頭前方 18cm</div>
-    <div class="progress-dots" id="progressDots"></div>
+    <div class="face-lbl" id="fl">準備掃描</div>
+    <div class="inst" id="inst">白色朝上，紅色面對鏡頭</div>
+    <div class="dots" id="dots"></div>
   </div>
 
-  <!-- Status bar -->
-  <div class="status-bar" id="statusBar" style="display:none">
-    <div class="motion-indicator">
-      <div class="motion-dot moving" id="motionDot"></div>
-      <div class="motion-text" id="motionText">偵測中...</div>
-    </div>
-    <div class="detected-grid" id="detectedGrid" style="display:none"></div>
+  <div class="bot" id="bot" style="display:none">
+    <div class="status" id="sts">對準框框，保持不動</div>
+    <div class="det-grid" id="dg" style="display:none"></div>
+    <div class="debug" id="dbg"></div>
   </div>
 
-  <!-- Confirm panel -->
-  <div class="confirm-panel" id="confirmPanel">
-    <h3 id="confirmTitle">確認顏色</h3>
-    <div class="btn-row" style="margin-bottom:10px">
-      <button class="btn btn-retry" onclick="retryFace()">重拍</button>
-      <button class="btn btn-confirm" onclick="confirmFace()">確認 ✓</button>
-    </div>
-    <div class="confirm-grid" id="confirmGrid"></div>
-    <div class="color-picker" id="colorPicker"></div>
-    <div style="text-align:center;font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px">點色塊可修正顏色</div>
+  <div class="rotate-ov" id="rotOv">
+    <div class="icon" id="rotIcon">↻</div>
+    <div class="txt" id="rotTxt">順時針轉 90°</div>
+    <div class="sub" id="rotSub">下一面：藍色中心</div>
+    <div class="countdown" id="rotCD">3</div>
   </div>
 
-  <!-- Rotation guide -->
-  <div class="rotate-guide" id="rotateGuide">
-    <div class="arrow-icon" id="rotateArrow">↻</div>
-    <div class="guide-text" id="rotateText">順時針轉 90°</div>
-    <div class="guide-sub" id="rotateSub">讓下一面對準鏡頭</div>
-    <button class="btn btn-confirm" onclick="startNextScan()">準備好了</button>
-  </div>
-
-  <!-- Start screen -->
-  <div class="start-screen" id="startScreen">
+  <div class="start" id="startScr">
     <h1>📷 魔方掃描器</h1>
-    <p>用後鏡頭掃描魔方 6 個面<br>白色朝上，紅色面對鏡頭<br>靜止不動就自動拍照</p>
-    <button class="btn btn-start" onclick="startCamera()">開始掃描</button>
+    <p>用後鏡頭掃描 6 面<br>白色朝上，紅色面對鏡頭<br>在框框中靜止 = 自動拍照</p>
+    <button class="btn" onclick="go()">開始掃描</button>
+  </div>
+
+  <div class="result" id="resultScr">
+    <h2 id="resTitle">掃描結果</h2>
+    <div class="msg" id="resMsg"></div>
+    <div class="face-preview" id="resFaces"></div>
+    <div class="data" id="resData"></div>
+    <button class="btn" id="resBtn" onclick="location.reload()">重新開始</button>
   </div>
 </div>
 
 <script>
-// ===== CONFIG =====
-const SCAN_ORDER = [
-  {face:'F', color:'R', name:'前面（紅色中心）', guide:'白色朝上，紅色面對鏡頭'},
-  {face:'R', color:'B', name:'右面（藍色中心）', rotate:'順時針轉 90°（向右轉）', arrow:'↻'},
-  {face:'B', color:'O', name:'後面（橘色中心）', rotate:'再順時針轉 90°', arrow:'↻'},
-  {face:'L', color:'G', name:'左面（綠色中心）', rotate:'再順時針轉 90°', arrow:'↻'},
-  {face:'U', color:'W', name:'上面（白色中心）', rotate:'往後傾，讓頂面對鏡頭', arrow:'↶'},
-  {face:'D', color:'Y', name:'下面（黃色中心）', rotate:'往前傾 180°，讓底面對鏡頭', arrow:'↷'},
+const SCAN=[
+  {f:'F',cc:'R',name:'前面（紅）',guide:'白色朝上，紅色對鏡頭'},
+  {f:'R',cc:'B',name:'右面（藍）',rot:'順時針轉 90°',arrow:'↻'},
+  {f:'B',cc:'O',name:'後面（橘）',rot:'再順時針轉 90°',arrow:'↻'},
+  {f:'L',cc:'G',name:'左面（綠）',rot:'再順時針轉 90°',arrow:'↻'},
+  {f:'U',cc:'W',name:'上面（白）',rot:'往後傾，頂面對鏡頭',arrow:'↶'},
+  {f:'D',cc:'Y',name:'下面（黃）',rot:'往前傾，底面對鏡頭',arrow:'↷'},
 ];
+const CMAP={W:'#FFFFFF',R:'#B71234',B:'#0046AD',O:'#FF5800',G:'#009B48',Y:'#FFD500'};
+const CC={F:'R',R:'B',B:'O',L:'G',U:'W',D:'Y'};
+const C2F={W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
 
-const COLOR_MAP = {
-  W:{hex:'#FFFFFF',name:'白'},R:{hex:'#B71234',name:'紅'},B:{hex:'#0046AD',name:'藍'},
-  O:{hex:'#FF5800',name:'橘'},G:{hex:'#009B48',name:'綠'},Y:{hex:'#FFD500',name:'黃'},
-};
-const CENTER_COLORS = {F:'R',R:'B',B:'O',L:'G',U:'W',D:'Y'};
+let vid,ov,octx,sm,sctx;
+let scanning=false, idx=0, prevF=null, still=0;
+let intv=null, faces={}, refs={};
+const STILL_TH=0.05, STILL_N=5; // 5 frames × 200ms = 1 sec
 
-// ===== STATE =====
-let video, overlay, octx, sampleCanvas, sctx;
-let scanning = false;
-let currentScanIdx = 0;
-let prevFrame = null;
-let stillCount = 0;
-const STILL_THRESHOLD = 0.05; // 5% pixel diff = still
-const STILL_FRAMES_NEEDED = 4; // ~800ms at 200ms interval
-let detectionInterval = null;
-let scannedFaces = {}; // face -> [9 colors]
-let editColor = 'W';
-let editFaceColors = [];
+function mkDots(){
+  document.getElementById('dots').innerHTML=SCAN.map((_,i)=>
+    `<div class="dot${i<idx?' done':''}${i===idx?' active':''}" id="d${i}"></div>`).join('');
+}
 
-// ===== INIT =====
-function buildProgressDots() {
-  const el = document.getElementById('progressDots');
-  el.innerHTML = SCAN_ORDER.map((_,i) =>
-    `<div class="dot${i===0?' active':''}" id="dot-${i}"></div>`
+async function go(){
+  document.getElementById('startScr').style.display='none';
+  vid=document.getElementById('vid');
+  ov=document.getElementById('ov');
+  octx=ov.getContext('2d');
+  sm=document.getElementById('sm');
+  sctx=sm.getContext('2d');
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
+    vid.srcObject=s; await vid.play();
+    ov.width=vid.videoWidth||720; ov.height=vid.videoHeight||1280;
+    sm.width=64; sm.height=64;
+    idx=0; mkDots(); startScan();
+  }catch(e){alert('相機錯誤: '+e.message);}
+}
+
+function startScan(){
+  const info=SCAN[idx];
+  document.getElementById('fl').textContent=info.name;
+  document.getElementById('inst').textContent=info.guide||'對準框框，保持不動';
+  document.getElementById('bot').style.display='block';
+  document.getElementById('dg').style.display='none';
+  document.getElementById('sts').textContent='對準框框，保持不動';
+  document.getElementById('dbg').textContent='';
+  mkDots();
+  scanning=true; prevF=null; still=0;
+  if(intv)clearInterval(intv);
+  intv=setInterval(tick,200);
+}
+
+function tick(){
+  if(!scanning||!vid.videoWidth)return;
+  sctx.drawImage(vid,0,0,64,64);
+  const fr=sctx.getImageData(0,0,64,64);
+  if(prevF){
+    let diff=0;const tot=fr.data.length/4;
+    for(let i=0;i<fr.data.length;i+=4){
+      const d=(Math.abs(fr.data[i]-prevF.data[i])+Math.abs(fr.data[i+1]-prevF.data[i+1])+Math.abs(fr.data[i+2]-prevF.data[i+2]))/3;
+      if(d>18)diff++;
+    }
+    const dr=diff/tot;
+    if(dr<STILL_TH){
+      still++;
+      document.getElementById('sts').textContent=`靜止中 ${'●'.repeat(still)}${'○'.repeat(Math.max(0,STILL_N-still))}`;
+      if(still>=STILL_N){capture();return;}
+    }else{
+      still=0;
+      document.getElementById('sts').textContent='對準框框，保持不動';
+    }
+  }
+  prevF=fr;
+  drawOv();
+}
+
+function drawOv(){
+  const vw=ov.width,vh=ov.height;
+  octx.clearRect(0,0,vw,vh);
+  const gs=Math.min(vw,vh)*0.55,cs=gs/3;
+  const sx=(vw-gs)/2,sy=(vh-gs)/2;
+
+  // Dim outside
+  octx.fillStyle='rgba(0,0,0,0.3)';
+  octx.fillRect(0,0,vw,sy);
+  octx.fillRect(0,sy+gs,vw,vh-sy-gs);
+  octx.fillRect(0,sy,sx,gs);
+  octx.fillRect(sx+gs,sy,vw-sx-gs,gs);
+
+  // Grid
+  octx.strokeStyle='rgba(255,215,0,0.5)';
+  octx.lineWidth=1.5;
+  for(let i=0;i<=3;i++){
+    octx.beginPath();octx.moveTo(sx+i*cs,sy);octx.lineTo(sx+i*cs,sy+gs);octx.stroke();
+    octx.beginPath();octx.moveTo(sx,sy+i*cs);octx.lineTo(sx+gs,sy+i*cs);octx.stroke();
+  }
+
+  // Corners
+  octx.strokeStyle='#FFD700';octx.lineWidth=3;
+  const mk=16;
+  [[sx,sy],[sx+gs,sy],[sx,sy+gs],[sx+gs,sy+gs]].forEach(([x,y])=>{
+    const dx=x===sx?1:-1,dy=y===sy?1:-1;
+    octx.beginPath();octx.moveTo(x+mk*dx,y);octx.lineTo(x,y);octx.lineTo(x,y+mk*dy);octx.stroke();
+  });
+
+  // Progress ring
+  if(still>0){
+    const ccx=sx+gs/2,ccy=sy+gs/2,prog=still/STILL_N;
+    octx.strokeStyle='#00D2FF';octx.lineWidth=3;
+    octx.beginPath();
+    octx.arc(ccx,ccy,gs/2+15,-Math.PI/2,-Math.PI/2+prog*Math.PI*2);
+    octx.stroke();
+  }
+
+  // Show live color sample dots
+  if(vid.videoWidth){
+    const tc=document.createElement('canvas');
+    tc.width=vw;tc.height=vh;
+    const tctx=tc.getContext('2d');
+    tctx.drawImage(vid,0,0,vw,vh);
+    for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+      const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
+      const d=tctx.getImageData(px-2,py-2,5,5);
+      let rr=0,gg=0,bb=0;
+      for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
+      const n=d.data.length/4;
+      rr=Math.round(rr/n);gg=Math.round(gg/n);bb=Math.round(bb/n);
+      // Small color dot
+      octx.beginPath();
+      octx.arc(px,py,8,0,Math.PI*2);
+      octx.fillStyle=`rgb(${rr},${gg},${bb})`;
+      octx.fill();
+      octx.strokeStyle='rgba(255,255,255,0.6)';
+      octx.lineWidth=1.5;
+      octx.stroke();
+    }
+  }
+}
+
+function capture(){
+  scanning=false;
+  if(intv)clearInterval(intv);
+  if(navigator.vibrate)navigator.vibrate(100);
+
+  const vw=vid.videoWidth,vh=vid.videoHeight;
+  const tc=document.createElement('canvas');
+  tc.width=vw;tc.height=vh;
+  const tctx=tc.getContext('2d');
+  tctx.drawImage(vid,0,0,vw,vh);
+
+  const gs=Math.min(vw,vh)*0.55,cs=gs/3;
+  const sx=(vw-gs)/2,sy=(vh-gs)/2;
+  const info=SCAN[idx];
+
+  let colors=[], rgbs=[];
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
+    const d=tctx.getImageData(px-3,py-3,7,7);
+    let rr=0,gg=0,bb=0;
+    for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
+    const n=d.data.length/4;
+    rr=Math.round(rr/n);gg=Math.round(gg/n);bb=Math.round(bb/n);
+    rgbs.push([rr,gg,bb]);
+    colors.push(classify(rr,gg,bb));
+  }
+
+  // Calibrate: center pixel = known color
+  const known=CC[info.f];
+  colors[4]=known;
+  refs[known]=rgbs[4];
+
+  // Re-classify with updated refs
+  for(let i=0;i<9;i++){
+    if(i===4)continue;
+    colors[i]=classify(rgbs[i][0],rgbs[i][1],rgbs[i][2]);
+  }
+  colors[4]=known;
+
+  // Show detected colors
+  const dg=document.getElementById('dg');
+  dg.style.display='grid';
+  dg.innerHTML=colors.map((col,i)=>
+    `<div class="det-cell" style="background:${CMAP[col]}">${i===4?'⭐':col}</div>`
   ).join('');
+  document.getElementById('sts').textContent='✅ 已拍攝';
+  document.getElementById('dbg').textContent=`RGB: ${rgbs.map(([r,g,b])=>`${r},${g},${b}`).join(' | ')}`;
+
+  // Store face
+  faces[info.f]=[...colors];
+
+  // Auto-advance after brief pause
+  setTimeout(()=>{
+    idx++;
+    if(idx>=SCAN.length){showResult();}
+    else{showRotate();}
+  }, 800);
 }
 
-async function startCamera() {
-  document.getElementById('startScreen').style.display = 'none';
-  video = document.getElementById('video');
-  overlay = document.getElementById('overlay');
-  octx = overlay.getContext('2d');
-  sampleCanvas = document.getElementById('sample');
-  sctx = sampleCanvas.getContext('2d');
+// Color classification
+function cdist(r1,g1,b1,r2,g2,b2){
+  const dr=r1-r2,dg=g1-g2,db=b1-b2;
+  return Math.sqrt(dr*dr*2+dg*dg*4+db*db*3);
+}
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }
+function classify(r,g,b){
+  const entries=Object.entries(refs);
+  if(entries.length>=3){
+    let best=null,bd=Infinity;
+    entries.forEach(([c,[rr,gg,bb]])=>{
+      const d=cdist(r,g,b,rr,gg,bb);
+      if(d<bd){bd=d;best=c;}
     });
-    video.srcObject = stream;
-    await video.play();
-
-    // Match overlay to video
-    const vw = video.videoWidth || 720;
-    const vh = video.videoHeight || 1280;
-    overlay.width = vw;
-    overlay.height = vh;
-    sampleCanvas.width = 64;
-    sampleCanvas.height = 64;
-
-    buildProgressDots();
-    currentScanIdx = 0;
-    startScanFace();
-  } catch(e) {
-    alert('無法開啟相機: ' + e.message);
+    if(best)return best;
   }
-}
-
-// ===== SCAN FACE =====
-function startScanFace() {
-  const info = SCAN_ORDER[currentScanIdx];
-  document.getElementById('faceLabel').textContent = info.name;
-  document.getElementById('instruction').textContent = info.guide || '對準魔方，靜止不動';
-  document.getElementById('statusBar').style.display = 'block';
-  document.getElementById('confirmPanel').classList.remove('show');
-  document.getElementById('detectedGrid').style.display = 'none';
-
-  // Update dots
-  SCAN_ORDER.forEach((_,i) => {
-    const dot = document.getElementById('dot-'+i);
-    if(!dot) return;
-    dot.className = 'dot' + (i < currentScanIdx ? ' done' : '') + (i === currentScanIdx ? ' active' : '');
-  });
-
-  scanning = true;
-  prevFrame = null;
-  stillCount = 0;
-  if(detectionInterval) clearInterval(detectionInterval);
-  detectionInterval = setInterval(detectMotion, 200);
-}
-
-// ===== MOTION DETECTION =====
-function detectMotion() {
-  if(!scanning || !video.videoWidth) return;
-
-  // Draw video frame to small canvas for comparison
-  sctx.drawImage(video, 0, 0, 64, 64);
-  const frame = sctx.getImageData(0, 0, 64, 64);
-
-  if(prevFrame) {
-    let diff = 0;
-    const total = frame.data.length / 4;
-    for(let i = 0; i < frame.data.length; i += 4) {
-      const dr = Math.abs(frame.data[i] - prevFrame.data[i]);
-      const dg = Math.abs(frame.data[i+1] - prevFrame.data[i+1]);
-      const db = Math.abs(frame.data[i+2] - prevFrame.data[i+2]);
-      if((dr + dg + db) / 3 > 20) diff++;
-    }
-    const diffRatio = diff / total;
-
-    const dot = document.getElementById('motionDot');
-    const txt = document.getElementById('motionText');
-
-    if(diffRatio < STILL_THRESHOLD) {
-      stillCount++;
-      if(stillCount >= STILL_FRAMES_NEEDED) {
-        dot.className = 'motion-dot capturing';
-        txt.textContent = '拍攝中...';
-        captureAndDetect();
-        return;
-      }
-      dot.className = 'motion-dot still';
-      txt.textContent = `靜止中... ${stillCount}/${STILL_FRAMES_NEEDED}`;
-    } else {
-      stillCount = 0;
-      dot.className = 'motion-dot moving';
-      txt.textContent = '請保持不動';
-    }
-  }
-  prevFrame = frame;
-
-  // Draw guide overlay
-  drawGuideOverlay();
-}
-
-// ===== GUIDE OVERLAY =====
-function drawGuideOverlay() {
-  const vw = overlay.width;
-  const vh = overlay.height;
-  octx.clearRect(0, 0, vw, vh);
-
-  // Draw 3x3 grid in center
-  const gridSize = Math.min(vw, vh) * 0.55;
-  const cellSize = gridSize / 3;
-  const startX = (vw - gridSize) / 2;
-  const startY = (vh - gridSize) / 2;
-
-  // Semi-transparent outside area
-  octx.fillStyle = 'rgba(0,0,0,0.3)';
-  octx.fillRect(0, 0, vw, startY);
-  octx.fillRect(0, startY + gridSize, vw, vh - startY - gridSize);
-  octx.fillRect(0, startY, startX, gridSize);
-  octx.fillRect(startX + gridSize, startY, vw - startX - gridSize, gridSize);
-
-  // Grid lines
-  octx.strokeStyle = 'rgba(255,215,0,0.6)';
-  octx.lineWidth = 2;
-  for(let i = 0; i <= 3; i++) {
-    // Vertical
-    octx.beginPath();
-    octx.moveTo(startX + i * cellSize, startY);
-    octx.lineTo(startX + i * cellSize, startY + gridSize);
-    octx.stroke();
-    // Horizontal
-    octx.beginPath();
-    octx.moveTo(startX, startY + i * cellSize);
-    octx.lineTo(startX + gridSize, startY + i * cellSize);
-    octx.stroke();
-  }
-
-  // Corner markers (thicker)
-  octx.strokeStyle = '#FFD700';
-  octx.lineWidth = 4;
-  const mk = 20;
-  [[startX,startY],[startX+gridSize,startY],[startX,startY+gridSize],[startX+gridSize,startY+gridSize]].forEach(([cx,cy])=>{
-    const dx = cx === startX ? 1 : -1;
-    const dy = cy === startY ? 1 : -1;
-    octx.beginPath();
-    octx.moveTo(cx + mk*dx, cy);
-    octx.lineTo(cx, cy);
-    octx.lineTo(cx, cy + mk*dy);
-    octx.stroke();
-  });
-
-  // Center crosshair
-  const ccx = startX + gridSize/2, ccy = startY + gridSize/2;
-  octx.strokeStyle = 'rgba(255,215,0,0.4)';
-  octx.lineWidth = 1;
-  octx.beginPath();
-  octx.moveTo(ccx - 10, ccy); octx.lineTo(ccx + 10, ccy);
-  octx.moveTo(ccx, ccy - 10); octx.lineTo(ccx, ccy + 10);
-  octx.stroke();
-
-  // Stillness ring
-  if(stillCount > 0) {
-    const progress = stillCount / STILL_FRAMES_NEEDED;
-    octx.strokeStyle = '#00D2FF';
-    octx.lineWidth = 3;
-    octx.beginPath();
-    octx.arc(ccx, ccy, gridSize/2 + 20, -Math.PI/2, -Math.PI/2 + progress * Math.PI * 2);
-    octx.stroke();
-  }
-}
-
-// ===== CAPTURE & COLOR DETECT =====
-function captureAndDetect() {
-  scanning = false;
-  if(detectionInterval) clearInterval(detectionInterval);
-
-  // Vibrate feedback
-  if(navigator.vibrate) navigator.vibrate(100);
-
-  const vw = video.videoWidth;
-  const vh = video.videoHeight;
-
-  // Draw full frame to overlay for sampling
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = vw;
-  tempCanvas.height = vh;
-  const tctx = tempCanvas.getContext('2d');
-  tctx.drawImage(video, 0, 0, vw, vh);
-
-  // Sample 9 points from the 3x3 grid
-  const gridSize = Math.min(vw, vh) * 0.55;
-  const cellSize = gridSize / 3;
-  const startX = (vw - gridSize) / 2;
-  const startY = (vh - gridSize) / 2;
-
-  const faceInfo = SCAN_ORDER[currentScanIdx];
-  let colors = [];
-  let centerRGB = null;
-
-  for(let r = 0; r < 3; r++) {
-    for(let c = 0; c < 3; c++) {
-      const cx = Math.round(startX + (c + 0.5) * cellSize);
-      const cy = Math.round(startY + (r + 0.5) * cellSize);
-
-      // Sample 7x7 pixel area and average
-      const imgData = tctx.getImageData(cx - 3, cy - 3, 7, 7);
-      let rr = 0, gg = 0, bb = 0;
-      for(let i = 0; i < imgData.data.length; i += 4) {
-        rr += imgData.data[i]; gg += imgData.data[i+1]; bb += imgData.data[i+2];
-      }
-      const n = imgData.data.length / 4;
-      rr = Math.round(rr/n); gg = Math.round(gg/n); bb = Math.round(bb/n);
-
-      // Save center pixel for calibration
-      if(r === 1 && c === 1) {
-        centerRGB = [rr, gg, bb];
-      }
-
-      const detected = classifyColor(rr, gg, bb);
-      colors.push(detected);
-    }
-  }
-
-  // Force center to known color and store as reference
-  const knownCenter = CENTER_COLORS[faceInfo.face];
-  colors[4] = knownCenter;
-  if(centerRGB) {
-    refColors[knownCenter] = centerRGB;
-    console.log(`Calibrated ${knownCenter}:`, centerRGB);
-  }
-
-  // Re-classify all non-center stickers using updated references
-  for(let r = 0; r < 3; r++) {
-    for(let c = 0; c < 3; c++) {
-      if(r === 1 && c === 1) continue;
-      const cx2 = Math.round(startX + (c + 0.5) * cellSize);
-      const cy2 = Math.round(startY + (r + 0.5) * cellSize);
-      const imgData2 = tctx.getImageData(cx2 - 3, cy2 - 3, 7, 7);
-      let rr2=0,gg2=0,bb2=0;
-      for(let i=0;i<imgData2.data.length;i+=4){rr2+=imgData2.data[i];gg2+=imgData2.data[i+1];bb2+=imgData2.data[i+2];}
-      const n2=imgData2.data.length/4;
-      colors[r*3+c] = classifyColor(Math.round(rr2/n2), Math.round(gg2/n2), Math.round(bb2/n2));
-    }
-  }
-  colors[4] = knownCenter; // ensure center stays correct
-
-  editFaceColors = [...colors];
-  showConfirmPanel(colors);
-}
-
-// ===== COLOR CLASSIFICATION =====
-// Instead of fixed HSV thresholds, we use the 6 known center colors
-// as calibration references. After scanning each face, the center pixel
-// gives us the ground-truth RGB for that color under current lighting.
-
-// Collected reference colors (RGB) from center pixels
-let refColors = {}; // e.g., {R: [180, 20, 30], B: [20, 40, 160], ...}
-
-function colorDistance(r1,g1,b1, r2,g2,b2) {
-  // Weighted Euclidean distance (human eye is more sensitive to green)
-  const dr=r1-r2, dg=g1-g2, db=b1-b2;
-  return Math.sqrt(dr*dr*2 + dg*dg*4 + db*db*3);
-}
-
-function classifyColor(r, g, b) {
-  // If we have reference colors, use nearest-neighbor
-  const refs = Object.entries(refColors);
-  if(refs.length >= 4) {
-    let best = null, bestDist = Infinity;
-    refs.forEach(([color, [rr,gg,bb]]) => {
-      const d = colorDistance(r,g,b, rr,gg,bb);
-      if(d < bestDist) { bestDist = d; best = color; }
-    });
-    if(best) return best;
-  }
-
-  // Fallback: HSV classification (used for first few faces before calibration)
-  return classifyByHSV(r, g, b);
-}
-
-function classifyByHSV(r, g, b) {
-  const rf=r/255, gf=g/255, bf=b/255;
-  const max=Math.max(rf,gf,bf), min=Math.min(rf,gf,bf), d=max-min;
-  let h=0, s=max===0?0:d/max, v=max;
+  // Fallback HSV
+  const rf=r/255,gf=g/255,bf=b/255;
+  const mx=Math.max(rf,gf,bf),mn=Math.min(rf,gf,bf),d=mx-mn;
+  let h=0,s=mx===0?0:d/mx,v=mx;
   if(d>0){
-    if(max===rf) h=60*(((gf-bf)/d+6)%6);
-    else if(max===gf) h=60*((bf-rf)/d+2);
+    if(mx===rf)h=60*(((gf-bf)/d+6)%6);
+    else if(mx===gf)h=60*((bf-rf)/d+2);
     else h=60*((rf-gf)/d+4);
   }
-
-  if(s<0.18 && v>0.55) return 'W';
-  if(h>=40 && h<80 && s>0.25 && v>0.45) return 'Y';
-  if(h>=14 && h<40 && s>0.35) return 'O';
-  if((h<14||h>335) && s>0.35) return 'R';
-  if(h>=80 && h<170 && s>0.2) return 'G';
-  if(h>=170 && h<265 && s>0.2) return 'B';
-  if(v>0.65) return 'W';
-  return 'Y';
+  if(s<0.18&&v>0.5)return 'W';
+  if(h>=35&&h<80&&s>0.2&&v>0.4)return 'Y';
+  if(h>=12&&h<35&&s>0.3)return 'O';
+  if((h<12||h>335)&&s>0.3)return 'R';
+  if(h>=80&&h<170&&s>0.15)return 'G';
+  if(h>=170&&h<270&&s>0.15)return 'B';
+  return v>0.6?'W':'Y';
 }
 
-// ===== CONFIRM PANEL =====
-function showConfirmPanel(colors) {
-  const panel = document.getElementById('confirmPanel');
-  panel.classList.add('show');
-
-  const info = SCAN_ORDER[currentScanIdx];
-  document.getElementById('confirmTitle').textContent = `確認 ${info.name}`;
-
-  buildConfirmGrid();
-  buildColorPicker();
-  document.getElementById('motionText').textContent = '已拍攝 ✓';
-  document.getElementById('motionDot').className = 'motion-dot still';
-}
-
-function buildConfirmGrid() {
-  const grid = document.getElementById('confirmGrid');
-  grid.innerHTML = '';
-  for(let i = 0; i < 9; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'confirm-cell' + (i === 4 ? ' center-cell' : '');
-    cell.style.background = COLOR_MAP[editFaceColors[i]].hex;
-    if(editFaceColors[i] === 'W' || editFaceColors[i] === 'Y') {
-      cell.style.borderColor = 'rgba(0,0,0,0.2)';
+// Rotation guide with auto-countdown
+function showRotate(){
+  const info=SCAN[idx];
+  const ov=document.getElementById('rotOv');
+  ov.classList.add('show');
+  document.getElementById('rotIcon').textContent=info.arrow||'↻';
+  document.getElementById('rotTxt').textContent=info.rot;
+  document.getElementById('rotSub').textContent=`下一面：${info.name}`;
+  let cd=3;
+  document.getElementById('rotCD').textContent=cd;
+  const ci=setInterval(()=>{
+    cd--;
+    if(cd<=0){
+      clearInterval(ci);
+      ov.classList.remove('show');
+      startScan();
+    }else{
+      document.getElementById('rotCD').textContent=cd;
     }
-    if(i !== 4) {
-      cell.onclick = () => {
-        editFaceColors[i] = editColor;
-        buildConfirmGrid();
-      };
-    } else {
-      cell.textContent = '⭐';
-      cell.style.display = 'flex';
-      cell.style.alignItems = 'center';
-      cell.style.justifyContent = 'center';
-      cell.style.fontSize = '18px';
-    }
-    grid.appendChild(cell);
-  }
+  },1000);
 }
 
-function buildColorPicker() {
-  const picker = document.getElementById('colorPicker');
-  picker.innerHTML = '';
-  Object.entries(COLOR_MAP).forEach(([k, v]) => {
-    const opt = document.createElement('div');
-    opt.className = 'color-opt' + (k === editColor ? ' sel' : '');
-    opt.style.background = v.hex;
-    if(k === 'W') opt.style.border = '3px solid #aaa';
-    opt.onclick = () => {
-      editColor = k;
-      document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('sel'));
-      opt.classList.add('sel');
+// Result screen
+function showResult(){
+  document.getElementById('bot').style.display='none';
+  const rs=document.getElementById('resultScr');
+  rs.classList.add('show');
+
+  // Build facelet
+  let fl='';
+  ['U','R','F','D','L','B'].forEach(f=>{
+    const c=faces[f];
+    if(!c){fl+='?????????';return;}
+    c.forEach(x=>fl+=C2F[x]||'?');
+  });
+
+  const cnt={};
+  for(const ch of fl)cnt[ch]=(cnt[ch]||0)+1;
+  const ok=!fl.includes('?')&&Object.values(cnt).every(v=>v===9);
+
+  // Face previews
+  const fp=document.getElementById('resFaces');
+  fp.innerHTML='';
+  ['U','R','F','D','L','B'].forEach(f=>{
+    const c=faces[f];
+    if(!c)return;
+    const d=document.createElement('div');
+    d.innerHTML=`<div class="face-title">${f}(${CC[f]==='W'?'白':CC[f]==='R'?'紅':CC[f]==='B'?'藍':CC[f]==='O'?'橘':CC[f]==='G'?'綠':'黃'})</div><div class="mini-face">${c.map(x=>`<div class="mc" style="background:${CMAP[x]}"></div>`).join('')}</div>`;
+    fp.appendChild(d);
+  });
+
+  if(ok){
+    document.getElementById('resTitle').textContent='✅ 掃描成功！';
+    document.getElementById('resMsg').innerHTML=`<span style="color:#00D2FF">顏色數量正確</span>`;
+    document.getElementById('resData').textContent=fl;
+    document.getElementById('resBtn').textContent='複製 Facelet';
+    document.getElementById('resBtn').onclick=()=>{
+      navigator.clipboard.writeText(fl).catch(()=>{});
+      alert('已複製！\n'+fl);
     };
-    picker.appendChild(opt);
-  });
-}
-
-function retryFace() {
-  document.getElementById('confirmPanel').classList.remove('show');
-  startScanFace();
-}
-
-function confirmFace() {
-  const info = SCAN_ORDER[currentScanIdx];
-  scannedFaces[info.face] = [...editFaceColors];
-
-  document.getElementById('confirmPanel').classList.remove('show');
-  currentScanIdx++;
-
-  if(currentScanIdx >= SCAN_ORDER.length) {
-    // All 6 faces scanned!
-    allFacesScanned();
-  } else {
-    // Show rotation guide
-    showRotateGuide();
+  }else{
+    document.getElementById('resTitle').textContent='⚠️ 顏色不對';
+    document.getElementById('resMsg').innerHTML=`<span style="color:#E94560">數量: ${JSON.stringify(cnt)}</span>`;
+    document.getElementById('resData').textContent=fl;
+    document.getElementById('resBtn').textContent='重新開始';
+    document.getElementById('resBtn').onclick=()=>location.reload();
   }
+
+  // Debug: show all ref colors
+  const refInfo=Object.entries(refs).map(([c,[r,g,b]])=>`${c}=(${r},${g},${b})`).join(' ');
+  document.getElementById('resData').textContent+='\nRefs: '+refInfo;
 }
 
-// ===== ROTATION GUIDE =====
-function showRotateGuide() {
-  const info = SCAN_ORDER[currentScanIdx];
-  const guide = document.getElementById('rotateGuide');
-  guide.classList.add('show');
-  document.getElementById('rotateArrow').textContent = info.arrow || '↻';
-  document.getElementById('rotateText').textContent = info.rotate;
-  document.getElementById('rotateSub').textContent = `下一面：${info.name}`;
-}
-
-function startNextScan() {
-  document.getElementById('rotateGuide').classList.remove('show');
-  startScanFace();
-}
-
-// ===== ALL FACES SCANNED =====
-function allFacesScanned() {
-  document.getElementById('statusBar').style.display = 'none';
-  document.getElementById('faceLabel').textContent = '✅ 掃描完成！';
-  document.getElementById('instruction').textContent = '6 面資料已收集';
-
-  // Build facelet string
-  const FACE_ORDER = ['U','R','F','D','L','B'];
-  const COLOR_TO_FACE = {W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
-
-  let facelet = '';
-  FACE_ORDER.forEach(f => {
-    const colors = scannedFaces[f];
-    if(!colors) { facelet += '?????????'; return; }
-    colors.forEach(c => { facelet += COLOR_TO_FACE[c] || '?'; });
-  });
-
-  // Validate counts
-  const counts = {};
-  'URFDLB'.split('').forEach(c => counts[c] = 0);
-  for(const ch of facelet) counts[ch] = (counts[ch]||0) + 1;
-  const valid = Object.values(counts).every(v => v === 9) && !facelet.includes('?');
-
-  // Show result
-  let resultHTML = `<div style="text-align:center;padding:20px;">`;
-  resultHTML += `<h2 style="color:#FFD700;margin-bottom:12px;">掃描結果</h2>`;
-
-  if(valid) {
-    resultHTML += `<p style="color:#00D2FF;font-size:16px;margin-bottom:8px;">✅ 顏色數量正確！</p>`;
-    resultHTML += `<p style="color:rgba(255,255,255,0.6);font-size:13px;word-break:break-all;">Facelet: ${facelet}</p>`;
-    resultHTML += `<button class="btn btn-confirm" style="margin-top:16px" onclick="copySolve('${facelet}')">複製到解題器</button>`;
-  } else {
-    resultHTML += `<p style="color:#E94560;font-size:14px;">顏色數量不對，請重新掃描</p>`;
-    resultHTML += `<pre style="font-size:11px;color:rgba(255,255,255,0.5)">${JSON.stringify(counts)}</pre>`;
-    resultHTML += `<button class="btn btn-retry" style="margin-top:12px" onclick="location.reload()">重新開始</button>`;
-  }
-  resultHTML += `</div>`;
-
-  const panel = document.getElementById('confirmPanel');
-  panel.innerHTML = resultHTML;
-  panel.classList.add('show');
-}
-
-function copySolve(facelet) {
-  // Copy facelet to clipboard
-  navigator.clipboard.writeText(facelet).then(() => {
-    alert('已複製 facelet 字串！\n\n' + facelet + '\n\n可以貼到魔方小老師解題器');
-  }).catch(() => {
-    prompt('複製這個字串到解題器：', facelet);
-  });
-}
-
-// ===== KEEP SCREEN ON =====
-let wakeLock = null;
-async function requestWakeLock() {
-  try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
-}
-requestWakeLock();
+// Wake lock
+(async()=>{try{await navigator.wakeLock.request('screen')}catch(e){}})();
 </script>
 </body>
 </html>
