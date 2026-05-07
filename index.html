@@ -341,6 +341,28 @@ function globalClassify(){
   showResult(true, anchorStr);
 }
 
+// Rotation guide with auto-countdown
+function showRotate(){
+  const info=SCAN[idx];
+  const ov=document.getElementById('rotOv');
+  ov.classList.add('show');
+  document.getElementById('rotIcon').textContent=info.arrow||'↻';
+  document.getElementById('rotTxt').textContent=info.rot;
+  document.getElementById('rotSub').textContent=`下一面：${info.name}`;
+  let cd=3;
+  document.getElementById('rotCD').textContent=cd;
+  const ci=setInterval(()=>{
+    cd--;
+    if(cd<=0){
+      clearInterval(ci);
+      ov.classList.remove('show');
+      startScan();
+    }else{
+      document.getElementById('rotCD').textContent=cd;
+    }
+  },1000);
+}
+
 // Result screen
 function showResult(dataOk, extra){
   document.getElementById('bot').style.display='none';
