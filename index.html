@@ -42,7 +42,7 @@ canvas#sample{display:none}
 .btn-start{background:#FFD700;color:#000;font-size:18px;padding:16px 40px}
 
 /* Confirm/edit modal */
-.confirm-panel{display:none;position:absolute;bottom:0;left:0;right:0;background:rgba(16,21,38,0.97);border-radius:20px 20px 0 0;padding:16px 16px 24px;z-index:20;max-height:55vh;overflow-y:auto}
+.confirm-panel{display:none;position:absolute;top:0;left:0;right:0;background:rgba(16,21,38,0.97);border-radius:0 0 20px 20px;padding:12px 16px 16px;z-index:20}
 .confirm-panel.show{display:block}
 .confirm-panel h3{text-align:center;font-size:17px;margin-bottom:10px}
 .confirm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:160px;margin:0 auto 12px}
@@ -94,12 +94,13 @@ canvas#sample{display:none}
   <!-- Confirm panel -->
   <div class="confirm-panel" id="confirmPanel">
     <h3 id="confirmTitle">確認顏色</h3>
-    <div class="confirm-grid" id="confirmGrid"></div>
-    <div class="color-picker" id="colorPicker"></div>
-    <div class="btn-row">
+    <div class="btn-row" style="margin-bottom:10px">
       <button class="btn btn-retry" onclick="retryFace()">重拍</button>
       <button class="btn btn-confirm" onclick="confirmFace()">確認 ✓</button>
     </div>
+    <div class="confirm-grid" id="confirmGrid"></div>
+    <div class="color-picker" id="colorPicker"></div>
+    <div style="text-align:center;font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px">點色塊可修正顏色</div>
   </div>
 
   <!-- Rotation guide -->
