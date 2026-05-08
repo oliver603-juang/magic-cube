@@ -3048,8 +3048,8 @@ function rotateCCW(f){const s=cubeState[f];cubeState[f]=[s[2],s[5],s[8],s[1],s[4
 function cycle(f){
   const s=cubeState;let t;
   switch(f){
-    case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.L[0];s.F[1]=s.L[1];s.F[2]=s.L[2];s.L[0]=s.B[0];s.L[1]=s.B[1];s.L[2]=s.B[2];s.B[0]=s.R[0];s.B[1]=s.R[1];s.B[2]=s.R[2];s.R[0]=t[0];s.R[1]=t[1];s.R[2]=t[2];break;
-    case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.R[6];s.F[7]=s.R[7];s.F[8]=s.R[8];s.R[6]=s.B[6];s.R[7]=s.B[7];s.R[8]=s.B[8];s.B[6]=s.L[6];s.B[7]=s.L[7];s.B[8]=s.L[8];s.L[6]=t[0];s.L[7]=t[1];s.L[8]=t[2];break;
+    case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.R[0];s.F[1]=s.R[1];s.F[2]=s.R[2];s.R[0]=s.B[0];s.R[1]=s.B[1];s.R[2]=s.B[2];s.B[0]=s.L[0];s.B[1]=s.L[1];s.B[2]=s.L[2];s.L[0]=t[0];s.L[1]=t[1];s.L[2]=t[2];break;
+    case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.L[6];s.F[7]=s.L[7];s.F[8]=s.L[8];s.L[6]=s.B[6];s.L[7]=s.B[7];s.L[8]=s.B[8];s.B[6]=s.R[6];s.B[7]=s.R[7];s.B[8]=s.R[8];s.R[6]=t[0];s.R[7]=t[1];s.R[8]=t[2];break;
     case'R':t=[s.F[2],s.F[5],s.F[8]];s.F[2]=s.D[2];s.F[5]=s.D[5];s.F[8]=s.D[8];s.D[2]=s.B[6];s.D[5]=s.B[3];s.D[8]=s.B[0];s.B[0]=s.U[8];s.B[3]=s.U[5];s.B[6]=s.U[2];s.U[2]=t[0];s.U[5]=t[1];s.U[8]=t[2];break;
     case'L':t=[s.F[0],s.F[3],s.F[6]];s.F[0]=s.U[0];s.F[3]=s.U[3];s.F[6]=s.U[6];s.U[0]=s.B[8];s.U[3]=s.B[5];s.U[6]=s.B[2];s.B[2]=s.D[6];s.B[5]=s.D[3];s.B[8]=s.D[0];s.D[0]=t[0];s.D[3]=t[1];s.D[6]=t[2];break;
     case'F':t=[s.U[6],s.U[7],s.U[8]];s.U[6]=s.L[8];s.U[7]=s.L[5];s.U[8]=s.L[2];s.L[2]=s.D[0];s.L[5]=s.D[1];s.L[8]=s.D[2];s.D[0]=s.R[6];s.D[1]=s.R[3];s.D[2]=s.R[0];s.R[0]=t[0];s.R[3]=t[1];s.R[6]=t[2];break;
