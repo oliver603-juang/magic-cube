@@ -2794,13 +2794,25 @@ const LBL_STAGES=[
   {n:3,name:'第二層邊塊',icon:'⬛',desc:'把中間層的邊塊插入正確位置',formula:"U R U' R' U' F' U F",
    tip:'找到頂層沒有黃色的邊塊，讓它遠離目標方向，再用公式插入'},
   {n:4,name:'黃色十字',icon:'✚',desc:'在下黃面做出黃色十字',formula:"B R D R' D' B'",
-   tip:'看下黃面的圖案：圓點→L形→一字→十字，每次一個公式'},
+   tip:'看下黃面的圖案：圓點→L形→一字→十字，每次一個公式',
+   chant:'後開｜右推 下轉｜右回 下回｜後關',
+   groups:[[0,0],[1,2],[3,4],[5,5]],
+   groupLabels:['開門','推轉','回回','關門']},
   {n:5,name:'黃色邊塊歸位',icon:'🔄',desc:'讓黃色十字的邊塊顏色對齊側面中心',formula:"R D R' D R D2 R'",
-   tip:'找到一個已對齊的邊，放到後面，再執行公式交換其他三邊'},
+   tip:'找到一個已對齊的邊，放到後面，再執行公式交換其他三邊',
+   chant:'右推｜下轉｜右回｜下轉｜右推｜下轉轉｜右回',
+   groups:[[0,0],[1,1],[2,2],[3,3],[4,4],[5,5],[6,6]],
+   groupLabels:['推','轉','回','轉','推','轉轉','回']},
   {n:6,name:'黃色角塊歸位',icon:'📐',desc:'把黃色角塊移到正確的角落（顏色可能還沒對）',formula:"D R D' L' D R' D' L",
-   tip:'找到一個位置正確的角，放到右前方，再執行公式交換其他三角'},
+   tip:'找到一個位置正確的角，放到右前方，再執行公式交換其他三角',
+   chant:'下轉 右推｜下回 左拉｜下轉 右回｜下回 左推',
+   groups:[[0,1],[2,3],[4,5],[6,7]],
+   groupLabels:['下右','回左','下右','回左']},
   {n:7,name:'黃色角塊翻轉',icon:'🔁',desc:'翻轉角塊讓黃色面朝下，完成魔方！',formula:"R D R' D'",
-   tip:'把未完成的角放到右前下方，重複公式直到黃色朝下，然後只轉D換下一個角'},
+   tip:'把未完成的角放到右前下方，重複公式直到黃色朝下，然後只轉D換下一個角',
+   chant:'右推｜下轉｜右回｜下回',
+   groups:[[0,0],[1,1],[2,2],[3,3]],
+   groupLabels:['推','轉','回','回']},
 ];
 
 // Generate a controlled scramble for a specific stage range
@@ -3093,6 +3105,40 @@ function showSolveStep(){
       // Show tip at stage start
       if(solveStep===currentStg.startIdx && currentStg.tip){
         progText+=`\n💡 ${currentStg.tip}`;
+      }
+      // Show rhythm chant card for formula stages
+      const stgDef=LBL_STAGES.find(s=>s.n===currentStg.stage);
+      if(stgDef && stgDef.chant && stgDef.groups){
+        const localIdx=solveStep-currentStg.startIdx;
+        const formula=stgDef.formula.split(/\s+/);
+        // Find which group the current local step belongs to
+        let curGroup=-1;
+        for(let g=0;g<stgDef.groups.length;g++){
+          const[gs,ge]=stgDef.groups[g];
+          if(localIdx>=gs && localIdx<=ge){curGroup=g;break;}
+        }
+        // Build chant card HTML
+        let chantHtml='<div style="margin-top:6px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:8px 12px;text-align:center">';
+        chantHtml+='<div style="font-size:10px;color:rgba(255,255,255,.35);margin-bottom:4px">🎵 節奏口訣</div>';
+        chantHtml+='<div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;align-items:center">';
+        for(let g=0;g<stgDef.groups.length;g++){
+          if(g>0)chantHtml+='<div style="color:rgba(255,255,255,.15);font-size:10px">｜</div>';
+          const[gs,ge]=stgDef.groups[g];
+          const isCur=g===curGroup;
+          const bg=isCur?'rgba(255,215,0,.3)':'rgba(255,255,255,.05)';
+          const clr=isCur?'#FFD700':'rgba(255,255,255,.4)';
+          const bdr=isCur?'2px solid #FFD700':'1px solid rgba(255,255,255,.1)';
+          const sc=isCur?'transform:scale(1.1)':'';
+          // Show moves in this group
+          const groupMoves=[];
+          for(let i=gs;i<=ge&&i<formula.length;i++)groupMoves.push(formula[i]);
+          chantHtml+=`<div style="background:${bg};color:${clr};border:${bdr};border-radius:6px;padding:3px 6px;font-size:12px;font-weight:700;${sc}">`;
+          chantHtml+=`<div style="font-size:10px;opacity:.6">${stgDef.groupLabels[g]}</div>`;
+          chantHtml+=groupMoves.join(' ');
+          chantHtml+='</div>';
+        }
+        chantHtml+='</div></div>';
+        progText+='\n'+chantHtml;
       }
     }
     // Item 4: Confetti when completing a stage (transition to next)
