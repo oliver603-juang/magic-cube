@@ -89,7 +89,13 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
     <div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px;max-width:260px;text-align:center;line-height:1.5">
       用相機掃描 6 面 → 自動最佳解 → 一步步教你還原<br>全程白色朝上！
     </div>
-    <button class="btn" style="margin-top:16px" onclick="startApp()">開始</button>
+    <button class="btn" style="margin-top:16px" onclick="startApp()">📸 開始掃描</button>
+    <button class="btn" style="margin-top:8px;background:rgba(0,210,255,.85)" onclick="showDojo()">💪 肌肉記憶道場</button>
+  </div>
+
+  <!-- Muscle Memory Dojo -->
+  <div class="overlay" id="dojoOv" style="justify-content:flex-start;padding-top:30px;overflow-y:auto">
+    <div id="dojoContent"></div>
   </div>
 
   <!-- Solving spinner -->
@@ -3179,6 +3185,229 @@ function undoMoveOnState(mv){
 
 // Wake lock
 (async()=>{try{await navigator.wakeLock.request('screen')}catch(e){}})();
+
+// ===== MUSCLE MEMORY DOJO =====
+const DOJO_EXERCISES=[
+  {id:'ruru',name:'右手公式',formula:"R U R' U'",reps:6,desc:'連續做 6 次，方塊會恢復原狀！',
+   steps:['右邊 推上去 ⬆','上面 往左推 ⬅','右邊 拉下來 ⬇','上面 往右推 ➡']},
+  {id:'lulu',name:'左手公式',formula:"L' U' L U",reps:6,desc:'右手公式的鏡像版，也做 6 次恢復',
+   steps:['左邊 拉下來 ⬇','上面 往右推 ➡','左邊 推上去 ⬆','上面 往左推 ⬅']},
+  {id:'rdrd',name:'翻角公式',formula:"R D R' D'",reps:6,desc:'角塊翻轉的關鍵，6 次恢復',
+   steps:['右邊 推上去 ⬆','下面 往右推 ➡','右邊 拉下來 ⬇','下面 往左推 ⬅']},
+];
+
+function dojoGetBest(id){
+  try{return parseFloat(localStorage.getItem('dojo_best_'+id))||null;}catch(e){return null;}
+}
+function dojoSetBest(id,t){
+  try{localStorage.setItem('dojo_best_'+id,t.toFixed(2));}catch(e){}
+}
+function dojoGetRank(t){
+  if(t<8) return{rank:'神速！',color:'#FFD700',emoji:'⚡'};
+  if(t<12) return{rank:'閃電俠',color:'#00D2FF',emoji:'🚀'};
+  if(t<18) return{rank:'音速小子',color:'#009B48',emoji:'💨'};
+  if(t<25) return{rank:'穩紮穩打',color:'#FF5800',emoji:'👍'};
+  return{rank:'繼續加油',color:'#aaa',emoji:'💪'};
+}
+
+function showDojo(){
+  document.getElementById('startOv').classList.remove('show');
+  document.getElementById('dojoOv').classList.add('show');
+  renderDojoMenu();
+}
+
+function renderDojoMenu(){
+  const el=document.getElementById('dojoContent');
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:0 16px">';
+  h+='<div style="font-size:24px;font-weight:900;color:#FFD700;margin-bottom:4px">💪 肌肉記憶道場</div>';
+  h+='<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:20px">拿一顆已還原的魔方，練到不用想！</div>';
+  
+  DOJO_EXERCISES.forEach(ex=>{
+    const best=dojoGetBest(ex.id);
+    const rank=best?dojoGetRank(best):null;
+    h+='<div style="background:rgba(255,255,255,.06);border-radius:14px;padding:16px;margin-bottom:10px;text-align:left" onclick="startDojoExercise(\''+ex.id+'\')">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center">';
+    h+='<div style="font-size:16px;font-weight:800;color:#fff">'+ex.name+'</div>';
+    if(best){
+      h+='<div style="font-size:13px;color:'+rank.color+'">'+rank.emoji+' '+best.toFixed(2)+'s</div>';
+    }
+    h+='</div>';
+    h+='<div style="font-size:13px;color:#00D2FF;font-family:monospace;margin-top:4px;letter-spacing:1px">'+ex.formula+'</div>';
+    h+='<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px">'+ex.desc+'</div>';
+    // Show 4-step mnemonic
+    h+='<div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">';
+    ex.steps.forEach((s,i)=>{
+      h+='<div style="background:rgba(255,215,0,.1);color:#FFD700;padding:3px 8px;border-radius:6px;font-size:11px">'+(i+1)+'. '+s+'</div>';
+    });
+    h+='</div>';
+    h+='</div>';
+  });
+
+  h+='<div style="margin-top:16px">';
+  h+='<button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="dojoBack()">← 返回首頁</button>';
+  h+='</div>';
+  h+='</div>';
+  el.innerHTML=h;
+}
+
+function dojoBack(){
+  document.getElementById('dojoOv').classList.remove('show');
+  document.getElementById('startOv').classList.add('show');
+}
+
+let _dojoTimer=null;
+let _dojoStartTime=0;
+let _dojoExId='';
+
+function startDojoExercise(id){
+  _dojoExId=id;
+  const ex=DOJO_EXERCISES.find(e=>e.id===id);
+  const el=document.getElementById('dojoContent');
+  
+  // Prep screen
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:0 16px">';
+  h+='<div style="font-size:20px;font-weight:900;color:#FFD700;margin-bottom:8px">'+ex.name+'</div>';
+  h+='<div style="font-size:14px;color:#00D2FF;font-family:monospace;letter-spacing:2px;margin-bottom:12px">'+ex.formula+'</div>';
+  
+  h+='<div style="font-size:14px;color:#fff;font-weight:700;margin-bottom:8px">訓練目標：連續完成 '+ex.reps+' 次</div>';
+  
+  // Show steps big
+  h+='<div style="background:rgba(255,255,255,.06);border-radius:12px;padding:14px;margin-bottom:16px;text-align:left">';
+  ex.steps.forEach((s,i)=>{
+    h+='<div style="font-size:15px;color:#fff;padding:6px 0;border-bottom:'+(i<3?'1px solid rgba(255,255,255,.08)':'none')+'">';
+    h+='<span style="color:#FFD700;font-weight:800;margin-right:8px">'+(i+1)+'</span>'+s+'</div>';
+  });
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:8px;text-align:center">重複 '+ex.reps+' 次 → 方塊會恢復原狀</div>';
+  h+='</div>';
+  
+  const best=dojoGetBest(id);
+  if(best){
+    const rank=dojoGetRank(best);
+    h+='<div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:12px">最佳紀錄：<span style="color:'+rank.color+'">'+best.toFixed(2)+'s '+rank.emoji+'</span></div>';
+  }
+  
+  h+='<button class="btn" style="font-size:18px;padding:16px 48px" onclick="dojoCountdown()">準備好了，開始！</button>';
+  h+='<div style="margin-top:12px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="renderDojoMenu()">← 返回</button></div>';
+  h+='</div>';
+  el.innerHTML=h;
+}
+
+function dojoCountdown(){
+  const el=document.getElementById('dojoContent');
+  let count=3;
+  el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:60vh"><div id="dojoCd" style="font-size:80px;font-weight:900;color:#FFD700">3</div></div>';
+  
+  const iv=setInterval(()=>{
+    count--;
+    if(count>0){
+      document.getElementById('dojoCd').textContent=count;
+    }else if(count===0){
+      document.getElementById('dojoCd').textContent='GO!';
+      document.getElementById('dojoCd').style.color='#00D2FF';
+    }else{
+      clearInterval(iv);
+      dojoStart();
+    }
+  },800);
+}
+
+function dojoStart(){
+  _dojoStartTime=performance.now();
+  const ex=DOJO_EXERCISES.find(e=>e.id===_dojoExId);
+  const el=document.getElementById('dojoContent');
+  
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:0 16px">';
+  // Timer
+  h+='<div id="dojoTime" style="font-size:56px;font-weight:900;color:#FFD700;font-family:monospace;margin-top:20px">0.00</div>';
+  h+='<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px">秒</div>';
+  
+  // Steps reminder (compact)
+  h+='<div style="margin-top:16px;font-size:13px;color:rgba(255,255,255,.5)">';
+  h+=ex.steps.map((s,i)=>'<span style="color:#FFD700">'+(i+1)+'</span> '+s).join(' → ');
+  h+='</div>';
+  h+='<div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:4px">重複 '+ex.reps+' 次</div>';
+  
+  // Giant stop button
+  h+='<div style="margin-top:30px">';
+  h+='<button class="btn" style="font-size:22px;padding:24px 60px;background:#E94560;width:90%;max-width:300px;border-radius:20px" onclick="dojoStop()">✋ 做完了！</button>';
+  h+='</div>';
+  h+='</div>';
+  el.innerHTML=h;
+  
+  // Update timer
+  _dojoTimer=setInterval(()=>{
+    const t=(performance.now()-_dojoStartTime)/1000;
+    const d=document.getElementById('dojoTime');
+    if(d)d.textContent=t.toFixed(2);
+  },50);
+}
+
+function dojoStop(){
+  clearInterval(_dojoTimer);
+  const elapsed=(performance.now()-_dojoStartTime)/1000;
+  const ex=DOJO_EXERCISES.find(e=>e.id===_dojoExId);
+  const el=document.getElementById('dojoContent');
+  
+  // Confirm
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:0 16px">';
+  h+='<div style="font-size:48px;font-weight:900;color:#FFD700;font-family:monospace;margin-top:20px">'+elapsed.toFixed(2)+'</div>';
+  h+='<div style="font-size:14px;color:rgba(255,255,255,.5);margin-top:4px">秒</div>';
+  
+  h+='<div style="font-size:16px;color:#fff;font-weight:700;margin-top:20px">方塊有恢復原狀嗎？</div>';
+  h+='<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px">做完 '+ex.reps+' 次後，6 面顏色應該跟開始一樣</div>';
+  
+  h+='<div style="display:flex;gap:10px;justify-content:center;margin-top:16px">';
+  h+='<button class="btn" style="background:#009B48;padding:14px 32px;font-size:16px" onclick="dojoConfirm('+elapsed.toFixed(2)+',true)">✅ 是！恢復了</button>';
+  h+='<button class="btn" style="background:rgba(255,255,255,.15);padding:14px 32px;font-size:16px" onclick="dojoConfirm('+elapsed.toFixed(2)+',false)">❌ 沒有</button>';
+  h+='</div>';
+  h+='</div>';
+  el.innerHTML=h;
+}
+
+function dojoConfirm(time, success){
+  const ex=DOJO_EXERCISES.find(e=>e.id===_dojoExId);
+  const el=document.getElementById('dojoContent');
+  
+  if(!success){
+    // Failed — encourage retry
+    let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:0 16px">';
+    h+='<div style="font-size:48px;margin-top:30px">🤔</div>';
+    h+='<div style="font-size:18px;font-weight:800;color:#fff;margin-top:12px">沒關係！再試一次</div>';
+    h+='<div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:8px;line-height:1.6">確認每一步的方向：</div>';
+    h+='<div style="background:rgba(255,255,255,.06);border-radius:12px;padding:14px;margin:12px 0;text-align:left">';
+    ex.steps.forEach((s,i)=>{
+      h+='<div style="font-size:15px;color:#fff;padding:6px 0"><span style="color:#FFD700;font-weight:800;margin-right:8px">'+(i+1)+'</span>'+s+'</div>';
+    });
+    h+='</div>';
+    h+='<button class="btn" style="margin-top:8px" onclick="startDojoExercise(\''+_dojoExId+'\')">🔄 再試一次</button>';
+    h+='</div>';
+    el.innerHTML=h;
+    return;
+  }
+  
+  // Success!
+  showConfetti();
+  const rank=dojoGetRank(time);
+  const best=dojoGetBest(_dojoExId);
+  const isNewBest=!best||time<best;
+  if(isNewBest)dojoSetBest(_dojoExId,time);
+  
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:0 16px">';
+  h+='<div style="font-size:64px;margin-top:20px">'+rank.emoji+'</div>';
+  h+='<div style="font-size:48px;font-weight:900;color:'+rank.color+';font-family:monospace;margin-top:8px">'+time.toFixed(2)+'s</div>';
+  h+='<div style="font-size:24px;font-weight:900;color:'+rank.color+';margin-top:8px">'+rank.rank+'</div>';
+  
+  if(isNewBest&&best){
+    h+='<div style="font-size:14px;color:#FFD700;margin-top:8px;animation:confetti-fall 0.5s ease-out">🏆 新紀錄！（上次 '+best.toFixed(2)+'s）</div>';
+  }
+  
+  h+='<div style="display:flex;gap:10px;justify-content:center;margin-top:20px">';
+  h+='<button class="btn" style="background:rgba(0,210,255,.85)" onclick="startDojoExercise(\''+_dojoExId+'\')">🔄 再挑戰</button>';
+  h+='<button class="btn" style="background:rgba(255,255,255,.15)" onclick="renderDojoMenu()">← 選其他</button>';
+  h+='</div>';
+  h+='</div>';
+  el.innerHTML=h;
+}
 </script>
 </body>
 </html>
