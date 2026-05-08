@@ -2151,14 +2151,13 @@ const SCAN_SEQ=[
 const CMAP={W:'#FFFFFF',R:'#B71234',B:'#0046AD',O:'#FF5800',G:'#009B48',Y:'#FFD500'};
 const CC={F:'R',R:'B',B:'O',L:'G',U:'W',D:'Y'};
 const C2F={W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
-const MDESC={
-  'U':'上層 ↻ 順時針',"U'":'上層 ↺ 逆時針','U2':'上層 180°',
-  'D':'下層 ↻ 順時針',"D'":'下層 ↺ 逆時針','D2':'下層 180°',
-  'R':'右層 ↻ 往下推',"R'":'右層 ↺ 往上推','R2':'右層 180°',
-  'L':'左層 ↻ 往下推',"L'":'左層 ↺ 往上推','L2':'左層 180°',
-  'F':'前層 ↻ 順時針',"F'":'前層 ↺ 逆時針','F2':'前層 180°',
-  'B':'後層 ↻ (從後看)',"B'":'後層 ↺ (從後看)','B2':'後層 180°',
-};
+const MDESC={};
+MDESC['U']='上層 ↻ 順時針';MDESC["U'"]='上層 ↺ 逆時針';MDESC['U2']='上層 180°';
+MDESC['D']='下層 ↻ 順時針';MDESC["D'"]='下層 ↺ 逆時針';MDESC['D2']='下層 180°';
+MDESC['R']='右層 ↻ 往下推';MDESC["R'"]='右層 ↺ 往上推';MDESC['R2']='右層 180°';
+MDESC['L']='左層 ↻ 往下推';MDESC["L'"]='左層 ↺ 往上推';MDESC['L2']='左層 180°';
+MDESC['F']='前層 ↻ 順時針';MDESC["F'"]='前層 ↺ 逆時針';MDESC['F2']='前層 180°';
+MDESC['B']='後層 ↻ (從後看)';MDESC["B'"]='後層 ↺ (從後看)';MDESC['B2']='後層 180°';
 
 let vid, ov, octx;
 let rawData={}, faceColors={}, cubeState={};
@@ -2447,7 +2446,6 @@ function finalizeSolve(){
     return;
   }
   doSolve(fl);
-}
 }
 
 function showFacePreviews(targetId){
