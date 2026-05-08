@@ -2141,23 +2141,24 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
 <script>
 // ===== CONSTANTS =====
 const SCAN_SEQ=[
-  {f:'F',name:'前面（紅）',guide:'白色朝上，紅色對鏡頭'},
-  {f:'R',name:'右面（藍）',guide:'順時針轉 90°，藍色對鏡頭'},
-  {f:'B',name:'後面（橘）',guide:'再轉 90°，橘色對鏡頭'},
-  {f:'L',name:'左面（綠）',guide:'再轉 90°，綠色對鏡頭'},
-  {f:'U',name:'上面（白）',guide:'往後傾，白色對鏡頭'},
-  {f:'D',name:'下面（黃）',guide:'往前傾，黃色對鏡頭'},
+  {f:'F',name:'前（紅）',guide:'上白朝天，前紅對鏡頭'},
+  {f:'R',name:'右（藍）',guide:'順時針轉 90°，右藍對鏡頭'},
+  {f:'B',name:'後（橘）',guide:'再轉 90°，後橘對鏡頭'},
+  {f:'L',name:'左（綠）',guide:'再轉 90°，左綠對鏡頭'},
+  {f:'U',name:'上（白）',guide:'轉回前紅，往前傾，上白對鏡頭'},
+  {f:'D',name:'下（黃）',guide:'往後傾 180°，下黃對鏡頭'},
 ];
 const CMAP={W:'#FFFFFF',R:'#B71234',B:'#0046AD',O:'#FF5800',G:'#009B48',Y:'#FFD500'};
 const CC={F:'R',R:'B',B:'O',L:'G',U:'W',D:'Y'};
 const C2F={W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
+const FLABEL={U:'上白',R:'右藍',F:'前紅',D:'下黃',L:'左綠',B:'後橘'};
 const MDESC={};
-MDESC['U']='上層 ↻ 順時針';MDESC["U'"]='上層 ↺ 逆時針';MDESC['U2']='上層 180°';
-MDESC['D']='下層 ↻ 順時針';MDESC["D'"]='下層 ↺ 逆時針';MDESC['D2']='下層 180°';
-MDESC['R']='右層 ↻ 往下推';MDESC["R'"]='右層 ↺ 往上推';MDESC['R2']='右層 180°';
-MDESC['L']='左層 ↻ 往下推';MDESC["L'"]='左層 ↺ 往上推';MDESC['L2']='左層 180°';
-MDESC['F']='前層 ↻ 順時針';MDESC["F'"]='前層 ↺ 逆時針';MDESC['F2']='前層 180°';
-MDESC['B']='後層 ↻ (從後看)';MDESC["B'"]='後層 ↺ (從後看)';MDESC['B2']='後層 180°';
+MDESC['U']='上白層 ↻ 順時針';MDESC["U'"]='上白層 ↺ 逆時針';MDESC['U2']='上白層 180°';
+MDESC['D']='下黃層 ↻ 順時針';MDESC["D'"]='下黃層 ↺ 逆時針';MDESC['D2']='下黃層 180°';
+MDESC['R']='右藍層 ↻ 往下推';MDESC["R'"]='右藍層 ↺ 往上推';MDESC['R2']='右藍層 180°';
+MDESC['L']='左綠層 ↻ 往下推';MDESC["L'"]='左綠層 ↺ 往上推';MDESC['L2']='左綠層 180°';
+MDESC['F']='前紅層 ↻ 順時針';MDESC["F'"]='前紅層 ↺ 逆時針';MDESC['F2']='前紅層 180°';
+MDESC['B']='後橘層 ↻ (從後看)';MDESC["B'"]='後橘層 ↺ (從後看)';MDESC['B2']='後橘層 180°';
 
 let vid, ov, octx;
 let rawData={}, faceColors={}, cubeState={};
@@ -2465,7 +2466,7 @@ function showEditableFaces(){
   html+='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">';
   ['U','R','F','D','L','B'].forEach(f=>{
     const c=faceColors[f];if(!c)return;
-    html+=`<div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.5);margin-bottom:2px">${f}</div>`;
+    html+=`<div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.5);margin-bottom:2px">${FLABEL[f]}</div>`;
     html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">`;
     c.forEach((x,i)=>{
       const isCenter=i===4;
@@ -2495,7 +2496,7 @@ function showFacePreviews(targetId){
   el.style.gridTemplateColumns='';
   el.innerHTML=['U','R','F','D','L','B'].map(f=>{
     const c=faceColors[f];if(!c)return'';
-    return `<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.4)">${f}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:36px">${c.map(x=>`<div style="width:10px;height:10px;border-radius:2px;background:${CMAP[x]||'#333'}"></div>`).join('')}</div></div>`;
+    return `<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.4)">${FLABEL[f]}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:36px">${c.map(x=>`<div style="width:10px;height:10px;border-radius:2px;background:${CMAP[x]||'#333'}"></div>`).join('')}</div></div>`;
   }).join('');
 }
 
@@ -2506,7 +2507,7 @@ function showError(msg){
   ['U','R','F','D','L','B'].forEach(f=>{
     const c=faceColors[f];if(!c)return;
     const d=document.createElement('div');
-    d.innerHTML=`<div style="font-size:8px;color:rgba(255,255,255,.4)">${f}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">${c.map(x=>`<div style="width:12px;height:12px;border-radius:2px;background:${CMAP[x]||'#333'}"></div>`).join('')}</div>`;
+    d.innerHTML=`<div style="font-size:8px;color:rgba(255,255,255,.4)">${FLABEL[f]}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">${c.map(x=>`<div style="width:12px;height:12px;border-radius:2px;background:${CMAP[x]||'#333'}"></div>`).join('')}</div>`;
     ef.appendChild(d);
   });
 }
@@ -2641,15 +2642,15 @@ function drawMoveOverlay(mv){
   octx.font='bold 16px Nunito';octx.textAlign='center';
 
   switch(face){
-    case 'F': drawArc(sx+gs/2,sy+gs/2,gs*.4,prime,dbl); octx.fillText('F 前層',sx+gs/2,sy-10); break;
-    case 'U': drawHArrow(sx,sy-10,gs,prime); hl(sx,sy,gs,cs,true); octx.fillText('U 上層',sx+gs/2,sy-20); break;
-    case 'D': drawHArrow(sx,sy+gs+10,gs,!prime); hl(sx,sy+gs-cs,gs,cs,true); octx.fillText('D 下層',sx+gs/2,sy+gs+30); break;
-    case 'R': drawVArrow(sx+gs+10,sy,gs,prime); hl(sx+gs-cs,sy,cs,gs,false); octx.fillText('R',sx+gs+24,sy+gs/2+5); break;
-    case 'L': drawVArrow(sx-10,sy,gs,!prime); hl(sx,sy,cs,gs,false); octx.fillText('L',sx-24,sy+gs/2+5); break;
+    case 'F': drawArc(sx+gs/2,sy+gs/2,gs*.4,prime,dbl); octx.fillText('前紅層',sx+gs/2,sy-10); break;
+    case 'U': drawHArrow(sx,sy-10,gs,prime); hl(sx,sy,gs,cs,true); octx.fillText('上白層',sx+gs/2,sy-20); break;
+    case 'D': drawHArrow(sx,sy+gs+10,gs,!prime); hl(sx,sy+gs-cs,gs,cs,true); octx.fillText('下黃層',sx+gs/2,sy+gs+30); break;
+    case 'R': drawVArrow(sx+gs+10,sy,gs,prime); hl(sx+gs-cs,sy,cs,gs,false); octx.fillText('右藍',sx+gs+24,sy+gs/2+5); break;
+    case 'L': drawVArrow(sx-10,sy,gs,!prime); hl(sx,sy,cs,gs,false); octx.fillText('左綠',sx-24,sy+gs/2+5); break;
     case 'B':
       octx.setLineDash([6,4]);octx.strokeStyle='rgba(255,215,0,.4)';octx.lineWidth=2;
       octx.strokeRect(sx-3,sy-3,gs+6,gs+6);octx.setLineDash([]);
-      octx.fillStyle='#FFD700';octx.fillText('B 後層（見右下圖）',sx+gs/2,sy-10);
+      octx.fillStyle='#FFD700';octx.fillText('後橘層（見右下圖）',sx+gs/2,sy-10);
       break;
   }
 }
@@ -2700,7 +2701,7 @@ function drawPersp(mv){
     c.beginPath();for(let i=0;i<=12;i++){const a=-Math.PI*.6+(Math.PI*1.2*i/12)*dir;i?c.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r):c.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}
     c.strokeStyle='#FFD700';c.lineWidth=2.5;c.lineCap='round';c.stroke();
     c.fillStyle='rgba(255,255,255,.4)';c.font='8px sans-serif';c.textAlign='center';
-    c.fillText('近',18,82);c.fillText('中',42,82);c.fillStyle='#FFD700';c.fillText('遠(轉)',69,82);
+    c.fillText('前',18,82);c.fillText('中',42,82);c.fillStyle='#FFD700';c.fillText('後橘(轉)',69,82);
   }
   if(face==='D'){
     c.fillStyle='rgba(255,255,255,.1)';c.fillRect(12,8,65,20);c.fillRect(12,32,65,20);
@@ -2711,7 +2712,7 @@ function drawPersp(mv){
     c.beginPath();for(let i=0;i<=12;i++){const a=-Math.PI*.6+(Math.PI*1.2*i/12)*dir;i?c.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r):c.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}
     c.strokeStyle='#FFD700';c.lineWidth=2.5;c.lineCap='round';c.stroke();
     c.fillStyle='rgba(255,255,255,.4)';c.font='8px sans-serif';c.textAlign='center';
-    c.fillText('上',44,6);c.fillText('中',44,50);c.fillStyle='#FFD700';c.fillText('下(轉)',44,90);
+    c.fillText('上白',44,6);c.fillText('中',44,50);c.fillStyle='#FFD700';c.fillText('下黃(轉)',44,90);
   }
 }
 
