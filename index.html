@@ -2199,7 +2199,7 @@ MDESC_KID['B']='後面 順時針轉 ↻';MDESC_KID["B'"]='後面 逆時針轉 �
 let vid, ov, octx;
 let rawData={}, faceColors={}, cubeState={};
 let scanIdx=0, solution=[], solveStep=-1;
-let solverWorker=null, solverCB=null;
+let solverWorker=null, solverCB=null, solverReady=false;
 let mode='start'; // start|scan|solve|done
 
 // ===== APP START =====
@@ -2223,7 +2223,9 @@ function initSolver(){
   const lib=document.getElementById('cubejs-src').textContent;
   const code=lib+`\nconst C=self.Cube||(typeof Cube!=='undefined'?Cube:null);let rdy=false;self.onmessage=function(e){if(e.data.t==='init'){try{C.initSolver();rdy=true;postMessage({t:'ok'})}catch(er){postMessage({t:'err',m:er.message})}}if(e.data.t==='solve'){if(!rdy){C.initSolver();rdy=true}try{const c=C.fromString(e.data.fl);postMessage({t:'sol',s:c.solve()})}catch(er){postMessage({t:'err',m:er.message})}}};`;
   solverWorker=new Worker(URL.createObjectURL(new Blob([code],{type:'application/javascript'})));
+  solverReady=false;
   solverWorker.onmessage=e=>{
+    if(e.data.t==='ok'){solverReady=true;}
     if(e.data.t==='sol'&&solverCB)solverCB(null,e.data.s);
     if(e.data.t==='err'&&solverCB)solverCB(new Error(e.data.m));
   };
@@ -2549,15 +2551,19 @@ function tryAutoRepair(fl, nonC, ambiguous, attempt){
 
   document.getElementById('info').textContent=attempt===0?'驗證中...':'修正嘗試 '+(attempt)+'...';
 
-  // Kill old worker (it might be stuck on unsolvable state) and create new one
+  // Kill old worker and create new one
   if(solverWorker) solverWorker.terminate();
   initSolver();
 
   // Wait for solver to be ready, then send solve
-  const readyCheck=setInterval(()=>{
-    // Solver init takes ~1-2s, we just send and see
-    clearInterval(readyCheck);
-    
+  function sendWhenReady(){
+    if(solverReady){
+      doSend();
+    }else{
+      setTimeout(sendWhenReady,100);
+    }
+  }
+  function doSend(){
     const solveTimeout=setTimeout(()=>{
       // Solver timed out = invalid state. Kill it.
       solverWorker.terminate();
@@ -2624,7 +2630,8 @@ function tryAutoRepair(fl, nonC, ambiguous, attempt){
         `<button class="btn" style="background:rgba(0,210,255,.9);margin-top:6px" onclick="startLBLMode()">📚 模式2：學習解魔方</button>`;
     };
     solverWorker.postMessage({t:'solve',fl});
-  }, 500); // brief wait for worker init
+  }
+  sendWhenReady();
 }
 
 function startSolveMode(){
