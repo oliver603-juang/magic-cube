@@ -2743,11 +2743,13 @@ function startSolveMode(){
   solveStep=-1;
   ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
   mode='solve';
+  window._lblMode=false;
   // Stop camera, black background
-  if(vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;}
-  vid.style.display='none';
+  try{if(vid&&vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;}}catch(e){}
+  if(vid)vid.style.display='none';
   document.querySelector('.wrap').style.background='#000';
   if(ov)ov.style.display='none';
+  document.getElementById('lblUI').style.display='none';
   showSolveStep();
 }
 
