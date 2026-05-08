@@ -2259,7 +2259,7 @@ function showScanUI(){
 }
 
 function drawGuideGrid(){
-  if(!ov.width)return;
+  if(!ov||!ov.width)return;
   const vw=ov.width,vh=ov.height;
   octx.clearRect(0,0,vw,vh);
   const gs=Math.min(vw,vh)*0.82,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
@@ -3001,7 +3001,12 @@ function showSolveStep(){
   document.getElementById('persp').classList.remove('show');
 
   if(solveStep===-1){
-    // Initial: use botBar for "ready?" screen
+    // In LBL mode: skip ready screen, auto-advance to step 0
+    if(window._lblMode){
+      nextMove();
+      return;
+    }
+    // Normal mode: use botBar for "ready?" screen
     document.getElementById('solveUI').style.display='none';
     document.getElementById('botBar').style.display='block';
     document.getElementById('topBar').style.display='block';
@@ -3115,13 +3120,7 @@ function showSolveStep(){
     solution.map((m,i)=>`<div class="sd${i===solveStep?' now':''}${i<solveStep?' done':''}">${m.replace("'","'")}</div>`).join('')+
     `</div>`;
 
-  // Perspective guide for B/D
-  if(face==='B'||face==='D'){
-    document.getElementById('persp').classList.add('show');
-    drawPersp(mv);
-  }
-
-  // Move diagram in center
+  // Move diagram in center (handles ALL faces including B and D)
   drawMoveDiagram(mv);
 
   // Buttons
@@ -3188,6 +3187,98 @@ function showIsometricView(id, fColors, rColors){
 
 // Inline SVG move diagram for solve mode
 
+// Unified move diagram: 3×3 grid + pentagon arrows for ALL moves
+function drawMoveDiagram(mv){
+  const face=mv[0],prime=mv.includes("'"),dbl=mv.includes('2');
+  const el=document.getElementById('sMoveVis');
+  const ac='#FFD700';
+  const n=dbl?2:1;
+  const ag=16;
+
+  // Pentagon arrow shape
+  function mkA(svgStr,cx,cy,dx,dy,cnt){
+    const len=Math.sqrt(dx*dx+dy*dy)||1;
+    const ux=dx/len,uy=dy/len,px=-uy,py=ux;
+    const aLen=22,headW=14,bodyW=8,headLen=12,bodyLen=aLen-headLen;
+    for(let i=0;i<cnt;i++){
+      const off=(i-(cnt-1)/2)*ag;
+      const bx=cx+px*off,by=cy+py*off;
+      const local=[[-bodyLen,-bodyW/2],[0,-bodyW/2],[0,-headW/2],[headLen,0],[0,headW/2],[0,bodyW/2],[-bodyLen,bodyW/2]];
+      const pts=local.map(([lx,ly])=>[(bx+lx*ux-ly*uy).toFixed(1),(by+lx*uy+ly*ux).toFixed(1)].join(',')).join(' ');
+      svgStr+=`<polygon points="${pts}" fill="${ac}" stroke="rgba(0,0,0,.3)" stroke-width="1" stroke-linejoin="round"/>`;
+    }
+    return svgStr;
+  }
+
+  // B move: isometric F+R grid, arrow on R's right column
+  if(face==='B'){
+    const w=180,h=160;
+    let svg=`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
+    const fs=66,cs=fs/3,fx=20,fy=35;
+    const rcw=cs*0.7,rsk=7,rx=fx+fs+3,ry=fy;
+    for(let r=0;r<3;r++)for(let c=0;c<3;c++)
+      svg+=`<rect x="${fx+c*cs+1}" y="${fy+r*cs+1}" width="${cs-2}" height="${cs-2}" rx="2" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
+    svg+=`<text x="${fx+fs/2}" y="${fy+fs+13}" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="sans-serif">前紅</text>`;
+    for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+      const x=rx+c*rcw,y=ry+r*cs+c*rsk;
+      const hl=c===2;
+      const pts=[[x,y],[x+rcw-1,y+rsk],[x+rcw-1,y+cs-1+rsk],[x,y+cs-1]].map(p=>p.join(',')).join(' ');
+      svg+=`<polygon points="${pts}" fill="${hl?'rgba(255,215,0,.2)':'rgba(255,255,255,.12)'}" stroke="${hl?ac:'rgba(255,255,255,.35)'}" stroke-width="${hl?'1.5':'1'}"/>`;
+    }
+    svg+=`<text x="${rx+rcw*1.5}" y="${fy+fs+rsk*3+13}" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="sans-serif">右藍</text>`;
+    const arrowX=rx+rcw*2.5+rsk*2;
+    if(prime) svg=mkA(svg,arrowX,fy+fs+rsk*2+8,0,18,n);
+    else svg=mkA(svg,arrowX,fy-8,0,-18,n);
+    svg+=`</svg>`;
+    el.innerHTML=svg;
+    return;
+  }
+
+  // All other moves: 3×3 grid + pentagon arrows
+  const sz=120,cs=sz/3,pad=30;
+  const tw=sz+pad*2,th=sz+pad*2;
+  let svg=`<svg width="${tw}" height="${th}" viewBox="0 0 ${tw} ${th}">`;
+  const ox=pad,oy=pad;
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++)
+    svg+=`<rect x="${ox+c*cs+1}" y="${oy+r*cs+1}" width="${cs-2}" height="${cs-2}" rx="3" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
+  const hl='rgba(255,215,0,.15)',hlS='rgba(255,215,0,.5)';
+
+  switch(face){
+    case 'R':
+      svg+=`<rect x="${ox+cs*2}" y="${oy}" width="${cs}" height="${sz}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
+      if(prime) svg=mkA(svg,ox+cs*2.5,oy+sz+8,0,18,n);
+      else svg=mkA(svg,ox+cs*2.5,oy-8,0,-18,n);
+      break;
+    case 'L':
+      svg+=`<rect x="${ox}" y="${oy}" width="${cs}" height="${sz}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
+      if(prime) svg=mkA(svg,ox+cs*0.5,oy-8,0,-18,n);
+      else svg=mkA(svg,ox+cs*0.5,oy+sz+8,0,18,n);
+      break;
+    case 'U':
+      svg+=`<rect x="${ox}" y="${oy}" width="${sz}" height="${cs}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
+      if(prime) svg=mkA(svg,ox+sz+8,oy+cs*0.5,18,0,n);
+      else svg=mkA(svg,ox-8,oy+cs*0.5,-18,0,n);
+      break;
+    case 'D':
+      svg+=`<rect x="${ox}" y="${oy+cs*2}" width="${sz}" height="${cs}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
+      if(prime) svg=mkA(svg,ox-8,oy+cs*2.5,-18,0,n);
+      else svg=mkA(svg,ox+sz+8,oy+cs*2.5,18,0,n);
+      break;
+    case 'F':
+      svg+=`<rect x="${ox}" y="${oy}" width="${sz}" height="${sz}" rx="6" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
+      if(prime){
+        svg=mkA(svg,ox-8,oy+cs*0.5,-18,0,n);
+        svg=mkA(svg,ox+sz+8,oy+cs*2.5,18,0,n);
+      }else{
+        svg=mkA(svg,ox+sz+8,oy+cs*0.5,18,0,n);
+        svg=mkA(svg,ox-8,oy+cs*2.5,-18,0,n);
+      }
+      break;
+  }
+  svg+=`</svg>`;
+  el.innerHTML=svg;
+}
+
 function nextMove(){
   solveStep++;
   if(solveStep>0 && solveStep<=solution.length){
@@ -3207,7 +3298,7 @@ function prevMove(){
 
 // ===== DRAW MOVE OVERLAY =====
 function drawMoveOverlay(mv){
-  if(!ov.width)return;
+  if(!ov||!ov.width)return;
   const vw=ov.width,vh=ov.height;
   octx.clearRect(0,0,vw,vh);
   const gs=Math.min(vw,vh)*0.82,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
