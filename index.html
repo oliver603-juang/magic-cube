@@ -2596,7 +2596,8 @@ function tryAutoRepair(fl, nonC, ambiguous, attempt){
       document.getElementById('info').innerHTML=`✅ 驗證成功！${attempt>0?'(修正了'+attempt+'次)':''}`;
       showFacePreviews('mgrid');
       document.getElementById('btnRow').innerHTML=
-        `<button class="btn" onclick="startSolveMode()">🚀 開始解題 (${solution.length} 步)</button>`;
+        `<button class="btn" onclick="startSolveMode()">🚀 模式1：最佳解 (${solution.length} 步)</button>`+
+        `<button class="btn" style="background:rgba(0,210,255,.9);margin-top:6px" onclick="startLBLMode()">📚 模式2：教學模式</button>`;
     };
     solverWorker.postMessage({t:'solve',fl});
   }, 500); // brief wait for worker init
@@ -2612,6 +2613,186 @@ function startSolveMode(){
   document.querySelector('.wrap').style.background='#000';
   if(ov)ov.style.display='none';
   showSolveStep();
+}
+
+// ===== LBL TEACHING MODE =====
+function startLBLMode(){
+  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
+  mode='lbl';
+  if(vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;}
+  vid.style.display='none';
+  document.querySelector('.wrap').style.background='#000';
+  if(ov)ov.style.display='none';
+  document.getElementById('botBar').style.display='none';
+  document.getElementById('topBar').style.display='none';
+
+  // Detect current LBL stage
+  const stage = detectLBLStage();
+  showLBLStage(stage);
+}
+
+function detectLBLStage(){
+  const s=cubeState;
+  // Check from most advanced to least
+  if(isCubeSolved()) return 8;
+  if(isYellowCornersPositioned()) return 7; // orient corners
+  if(isYellowEdgesPositioned()) return 6;   // position corners
+  if(isYellowCrossDone_LBL()) return 5;     // position edges
+  if(isSecondLayerDone_LBL()) return 4;      // yellow cross
+  if(isFirstLayerDone_LBL()) return 3;       // second layer
+  if(isWhiteCrossDone_LBL()) return 2;       // first layer corners
+  return 1; // white cross
+}
+
+function isCubeSolved(){
+  return ['U','R','F','D','L','B'].every(f=>cubeState[f].every(c=>c===cubeState[f][4]));
+}
+function isWhiteCrossDone_LBL(){
+  const s=cubeState;
+  return s.U[1]==='W'&&s.U[3]==='W'&&s.U[5]==='W'&&s.U[7]==='W'
+    &&s.F[1]===s.F[4]&&s.R[1]===s.R[4]&&s.B[1]===s.B[4]&&s.L[1]===s.L[4];
+}
+function isFirstLayerDone_LBL(){
+  if(!isWhiteCrossDone_LBL()) return false;
+  const s=cubeState;
+  return s.U.every(c=>c==='W')
+    &&s.F[0]===s.F[4]&&s.F[2]===s.F[4]
+    &&s.R[0]===s.R[4]&&s.R[2]===s.R[4]
+    &&s.B[0]===s.B[4]&&s.B[2]===s.B[4]
+    &&s.L[0]===s.L[4]&&s.L[2]===s.L[4];
+}
+function isSecondLayerDone_LBL(){
+  if(!isFirstLayerDone_LBL()) return false;
+  const s=cubeState;
+  return s.F[3]===s.F[4]&&s.F[5]===s.F[4]
+    &&s.R[3]===s.R[4]&&s.R[5]===s.R[4]
+    &&s.B[3]===s.B[4]&&s.B[5]===s.B[4]
+    &&s.L[3]===s.L[4]&&s.L[5]===s.L[4];
+}
+function isYellowCrossDone_LBL(){
+  if(!isSecondLayerDone_LBL()) return false;
+  const s=cubeState;
+  return s.D[1]==='Y'&&s.D[3]==='Y'&&s.D[5]==='Y'&&s.D[7]==='Y';
+}
+function isYellowEdgesPositioned(){
+  if(!isYellowCrossDone_LBL()) return false;
+  const s=cubeState;
+  return s.F[7]===s.F[4]&&s.R[7]===s.R[4]&&s.B[7]===s.B[4]&&s.L[7]===s.L[4];
+}
+function isYellowCornersPositioned(){
+  if(!isYellowEdgesPositioned()) return false;
+  const s=cubeState;
+  function cornerOK(d,f1,p1,f2,p2){
+    const c=[s.D[d],s[f1][p1],s[f2][p2]].sort().join('');
+    const e=['Y',s[f1][4],s[f2][4]].sort().join('');
+    return c===e;
+  }
+  return cornerOK(0,'F',6,'L',8)&&cornerOK(2,'R',6,'F',8)
+    &&cornerOK(6,'L',6,'B',8)&&cornerOK(8,'B',6,'R',8);
+}
+
+const LBL_STAGES=[
+  {n:1,name:'白色十字',icon:'✚',desc:'在上白面做出白色十字，邊塊顏色要對齊中心',formula:'直覺，不需公式'},
+  {n:2,name:'第一層角塊',icon:'🔲',desc:'用右手公式把白色角塊放到正確位置',formula:'R U R\' U\''},
+  {n:3,name:'第二層邊塊',icon:'⬛',desc:'把中間層的邊塊插入正確位置',formula:'U R U\' R\' U\' F\' U F'},
+  {n:4,name:'黃色十字',icon:'✚',desc:'在下黃面做出黃色十字',formula:'F R U R\' U\' F\''},
+  {n:5,name:'黃色邊塊歸位',icon:'🔄',desc:'讓黃色十字的邊塊顏色對齊中心',formula:'R U R\' U R U2 R\''},
+  {n:6,name:'黃色角塊歸位',icon:'📐',desc:'把黃色角塊移到正確的角落',formula:'U R U\' L\' U R\' U\' L'},
+  {n:7,name:'黃色角塊翻轉',icon:'🔁',desc:'翻轉角塊讓黃色面朝下',formula:'R\' D\' R D'},
+];
+
+function showLBLStage(currentStage){
+  if(currentStage>=8){
+    document.getElementById('doneOv').classList.add('show');
+    return;
+  }
+
+  const solveUI=document.getElementById('solveUI');
+  solveUI.style.display='flex';
+
+  let html=`<div style="width:100%;max-width:360px;margin:0 auto;text-align:center">`;
+  html+=`<div style="font-size:20px;font-weight:900;color:#FFD700;margin-bottom:12px">📚 教學模式</div>`;
+  
+  // Stage progress
+  html+=`<div style="display:flex;gap:4px;justify-content:center;margin-bottom:16px">`;
+  for(let i=1;i<=7;i++){
+    const done=i<currentStage;
+    const active=i===currentStage;
+    const bg=done?'rgba(0,210,255,.3)':active?'#FFD700':'rgba(255,255,255,.1)';
+    const color=done?'#00D2FF':active?'#000':'rgba(255,255,255,.3)';
+    html+=`<div style="width:32px;height:32px;border-radius:8px;background:${bg};color:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${i}</div>`;
+  }
+  html+=`</div>`;
+
+  // Current stage info
+  const stg=LBL_STAGES[currentStage-1];
+  html+=`<div style="background:rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:12px">`;
+  html+=`<div style="font-size:32px;margin-bottom:4px">${stg.icon}</div>`;
+  html+=`<div style="font-size:18px;font-weight:800;color:#FFD700">第 ${stg.n} 關：${stg.name}</div>`;
+  html+=`<div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;line-height:1.5">${stg.desc}</div>`;
+  html+=`<div style="font-size:14px;color:#00D2FF;margin-top:8px;font-family:monospace;letter-spacing:1px">${stg.formula}</div>`;
+  html+=`</div>`;
+
+  // Current cube state preview (6 faces)
+  html+=`<div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">`;
+  ['U','R','F','D','L','B'].forEach(f=>{
+    html+=`<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.4)">${FLABEL[f]}</div>`;
+    html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">`;
+    cubeState[f].forEach(c=>{
+      html+=`<div style="width:12px;height:12px;border-radius:2px;background:${CMAP[c]||'#333'}"></div>`;
+    });
+    html+=`</div></div>`;
+  });
+  html+=`</div>`;
+
+  // Action buttons
+  html+=`<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">`;
+  html+=`<button class="btn" onclick="runLBLStage(${currentStage})">▶ 開始第 ${currentStage} 關</button>`;
+  html+=`</div>`;
+  
+  html+=`<div style="margin-top:12px">`;
+  html+=`<button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="location.reload()">🔄 我迷路了（重新掃描）</button>`;
+  html+=`</div>`;
+
+  html+=`</div>`;
+  solveUI.innerHTML=html;
+}
+
+function runLBLStage(stageNum){
+  // For now: use Kociemba to solve, but show stage info
+  // TODO: Replace with proper LBL algorithms per stage
+  const stg=LBL_STAGES[stageNum-1];
+  
+  // Use Kociemba as fallback solver for all stages
+  const FO=['U','R','F','D','L','B'];
+  let fl='';FO.forEach(f=>{cubeState[f].forEach(x=>fl+=C2F[x]||'?');});
+  
+  document.getElementById('solveUI').innerHTML=
+    `<div style="text-align:center;padding:20px">
+      <div style="font-size:16px;font-weight:800;color:#FFD700">第 ${stg.n} 關：${stg.name}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px">公式：${stg.formula}</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:12px">使用最佳解引擎生成步驟...</div>
+      <div style="font-size:24px;margin-top:8px;animation:spin 1s linear infinite">⚙️</div>
+    </div>`;
+
+  // Solve with Kociemba (full solve, but we'll present it staged)
+  if(solverWorker)solverWorker.terminate();
+  initSolver();
+  setTimeout(()=>{
+    solverCB=(err,sol)=>{
+      if(err||!sol||!sol.trim()){
+        document.getElementById('solveUI').innerHTML=
+          `<div style="text-align:center;padding:20px;color:#E94560">解題失敗</div>
+           <button class="btn" onclick="location.reload()">重新開始</button>`;
+        return;
+      }
+      solution=sol.trim().split(/\s+/);
+      solveStep=-1;
+      mode='solve';
+      showSolveStep();
+    };
+    solverWorker.postMessage({t:'solve',fl});
+  },500);
 }
 
 let editSelColor='W';
