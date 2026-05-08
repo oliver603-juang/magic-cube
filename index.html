@@ -92,6 +92,7 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
     <button class="btn" style="margin-top:16px" onclick="startApp()">📸 開始掃描</button>
     <button class="btn" style="margin-top:8px;background:rgba(0,210,255,.85)" onclick="startLBLDirect()">📚 LBL 逆向教學</button>
     <button class="btn" style="margin-top:8px;background:rgba(255,255,255,.15);color:#ccc" onclick="showDojo()">💪 肌肉記憶道場</button>
+    <button class="btn btn-sm" style="margin-top:12px;background:rgba(255,100,0,.3);color:#f90" onclick="debugTestSolver()">🔧 測試求解器</button>
   </div>
 
   <!-- Muscle Memory Dojo -->
@@ -3229,6 +3230,90 @@ function applyMove(mv){
 function undoMoveOnState(mv){
   const f=mv[0],p=mv.includes("'"),d=mv.includes('2'),n=d?2:(p?1:3);
   for(let i=0;i<n;i++){rotateCW(f);cycle(f);}
+}
+
+// ===== DEBUG: Test solver with simulated data =====
+function debugTestSolver(){
+  document.getElementById('startOv').classList.remove('show');
+  document.getElementById('topBar').style.display='block';
+  document.getElementById('botBar').style.display='block';
+  
+  const dbgEl=document.getElementById('info');
+  const log=s=>{dbgEl.innerHTML+=s+'<br>';console.log(s);};
+  dbgEl.innerHTML='';
+  log('🔧 開始測試求解器...');
+  
+  // Inject a known scramble: R U F applied to solved cube
+  // Expected facelet: UUUUUULLDFBBFRRFRRFFRFFRDDRRRUDDBDDBFFDLLDLLBLLLUBBUBB
+  const testFl='UUUUUULLDFBBFRRFRRFFRFFRDDRRRUDDBDDBFFDLLDLLBLLLUBBUBB';
+  log('Facelet: '+testFl);
+  
+  // Step 1: Test worker creation
+  log('Step 1: 建立 Worker...');
+  try{
+    if(solverWorker)solverWorker.terminate();
+    initSolver();
+    log('Worker 已建立, solverReady='+solverReady);
+  }catch(e){
+    log('❌ Worker 建立失敗: '+e.message);
+    return;
+  }
+  
+  // Step 2: Wait for ready
+  log('Step 2: 等待 Worker 初始化...');
+  let waitCount=0;
+  function checkReady(){
+    waitCount++;
+    if(solverReady){
+      log('✅ Worker 就緒 (等了 '+(waitCount*100)+'ms)');
+      testSolve();
+    }else if(waitCount>50){
+      log('❌ Worker 初始化超時 (5秒)');
+      log('solverReady='+solverReady);
+    }else{
+      dbgEl.innerHTML=dbgEl.innerHTML.replace(/等待中\.*/, '等待中'+'.'.repeat(waitCount%4));
+      setTimeout(checkReady,100);
+    }
+  }
+  checkReady();
+  
+  function testSolve(){
+    log('Step 3: 發送求解請求...');
+    
+    const timeout=setTimeout(()=>{
+      log('❌ 求解超時 (5秒)');
+      log('Worker 可能卡在 initSolver() 的 lookup table 計算');
+    },5000);
+    
+    solverCB=(err,sol)=>{
+      clearTimeout(timeout);
+      if(err){
+        log('❌ 求解錯誤: '+err.message);
+        return;
+      }
+      if(!sol||!sol.trim()){
+        log('✅ 已經是還原狀態（空解）');
+      }else{
+        log('✅ 求解成功！');
+        log('解法: '+sol.trim());
+        log('步數: '+sol.trim().split(/\s+/).length);
+        solution=sol.trim().split(/\s+/);
+        
+        // Also set up faceColors for mode selection
+        const F2C={U:'W',R:'B',F:'R',D:'Y',L:'G',B:'O'};
+        const FO=['U','R','F','D','L','B'];
+        FO.forEach((f,fi)=>{
+          faceColors[f]=[];
+          for(let i=0;i<9;i++)faceColors[f].push(F2C[testFl[fi*9+i]]);
+        });
+        
+        document.getElementById('btnRow').innerHTML=
+          '<button class="btn" onclick="startSolveMode()">🚀 模式1：最佳解 ('+solution.length+' 步)</button>'+
+          '<button class="btn" style="background:rgba(0,210,255,.9);margin-top:6px" onclick="startLBLMode()">📚 模式2：學習解魔方</button>';
+      }
+    };
+    solverWorker.postMessage({t:'solve',fl:testFl});
+  }
 }
 
 // Wake lock
