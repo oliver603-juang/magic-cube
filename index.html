@@ -2853,17 +2853,39 @@ function drawMoveDiagram(mv){
   const n=dbl?2:1;
   const ag=12;
 
-  // Big arrow helper: draws n large arrows with clear direction
+  // Chunky pentagon arrow (like the reference icon)
   function mkA(svgStr,cx,cy,dx,dy,cnt){
     const len=Math.sqrt(dx*dx+dy*dy)||1;
     const ux=dx/len,uy=dy/len,px=-uy,py=ux;
-    const aLen=24; // longer arrow
+    // Arrow dimensions
+    const aLen=22,headW=14,bodyW=8,headLen=12,bodyLen=aLen-headLen;
     for(let i=0;i<cnt;i++){
       const off=(i-(cnt-1)/2)*ag;
-      const x1=cx+px*off,y1=cy+py*off;
-      const x2=x1+ux*aLen,y2=y1+uy*aLen;
-      svgStr+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${ac}" stroke-width="4" stroke-linecap="round"/>`;
-      svgStr+=`<polygon points="${x2+ux*3},${y2+uy*3} ${x2-ux*9+py*7},${y2-uy*9-px*7} ${x2-ux*9-py*7},${y2-uy*9+px*7}" fill="${ac}"/>`;
+      const bx=cx+px*off,by=cy+py*off;
+      // 7 points: body rect + triangle head
+      // body back-left, body back-right, body front-left, head-left, tip, head-right, body front-right
+      const pts=[
+        [bx-px*bodyW, by+px*bodyW],                                    // body back-left (wrong, redo)
+      ];
+      // Simpler: define in arrow-local coords then rotate
+      // Local: arrow points in +X direction
+      // Body: rect from (-bodyLen, -bodyW/2) to (0, bodyW/2)
+      // Head: triangle from (0, -headW/2) to (headLen, 0) to (0, headW/2)
+      const local = [
+        [-bodyLen, -bodyW/2],
+        [0, -bodyW/2],
+        [0, -headW/2],
+        [headLen, 0],
+        [0, headW/2],
+        [0, bodyW/2],
+        [-bodyLen, bodyW/2],
+      ];
+      // Rotate to match (dx,dy) direction
+      const rotated = local.map(([lx,ly]) => [
+        bx + lx*ux - ly*uy,
+        by + lx*uy + ly*ux
+      ]);
+      svgStr+=`<polygon points="${rotated.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="${ac}" stroke="rgba(0,0,0,.3)" stroke-width="1" stroke-linejoin="round"/>`;
     }
     return svgStr;
   }
