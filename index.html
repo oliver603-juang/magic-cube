@@ -2324,85 +2324,89 @@ function doClassify(){
 
 function tryAutoRepair(fl, nonC, ambiguous, attempt){
   if(attempt>20){
-    // Give up auto-repair, show editable view
     document.getElementById('info').innerHTML='<span style="color:#E94560">自動修正失敗，請手動確認顏色</span>';
     showEditableFaces();
     document.getElementById('btnRow').innerHTML='<button class="btn" onclick="finalizeSolve()">✅ 確認後解題</button>';
     return;
   }
 
-  // Try solving with 3-second timeout via worker
-  const solveTimeout=setTimeout(()=>{
-    // Solver timed out = invalid state
-    // Swap the most ambiguous sticker to its 2nd choice
-    if(attempt<ambiguous.length){
-      const s=ambiguous[attempt];
-      // Find another sticker with opposite swap
-      const swapPartner=ambiguous.find(p=>p!==s&&p.color===s.secondColor&&
-        (p.secondColor===s.color||p.dists[s.color]<p.dists[p.color]*1.5));
-      
-      if(swapPartner){
-        // Swap colors
-        const tmp=s.color;s.color=swapPartner.color;swapPartner.color=tmp;
-      }else{
-        // Just change this one to 2nd choice and find someone to swap back
-        const otherSame=nonC.find(p=>p!==s&&p.color===s.secondColor&&p.ambiguity<0.5);
-        if(otherSame){
-          s.color=s.secondColor;
-          otherSame.color=s.secondColor===otherSame.color?otherSame.secondColor:s.secondColor;
-        }else{
-          s.color=s.secondColor;
-        }
-      }
+  document.getElementById('info').textContent=attempt===0?'驗證中...':'修正嘗試 '+(attempt)+'...';
 
-      // Rebuild faceColors and facelet
-      const FO=['U','R','F','D','L','B'];
-      const all=[...nonC];
-      FO.forEach(f=>{
-        const centerColor=CC[f];
-        const faceStickers=all.filter(st=>st.face===f).sort((a,b)=>a.pos-b.pos);
-        faceColors[f]=[];
-        for(let i=0;i<9;i++){
-          if(i===4) faceColors[f].push(centerColor);
-          else{
-            const st=faceStickers.find(s=>s.pos===i);
-            faceColors[f].push(st?st.color:'?');
+  // Kill old worker (it might be stuck on unsolvable state) and create new one
+  if(solverWorker) solverWorker.terminate();
+  initSolver();
+
+  // Wait for solver to be ready, then send solve
+  const readyCheck=setInterval(()=>{
+    // Solver init takes ~1-2s, we just send and see
+    clearInterval(readyCheck);
+    
+    const solveTimeout=setTimeout(()=>{
+      // Solver timed out = invalid state. Kill it.
+      solverWorker.terminate();
+      solverCB=null;
+
+      // Swap the most ambiguous sticker
+      if(attempt<ambiguous.length){
+        const s=ambiguous[attempt];
+        const swapPartner=ambiguous.find(p=>p!==s&&p.color===s.secondColor&&
+          (p.secondColor===s.color||p.dists[s.color]<p.dists[p.color]*1.5));
+        
+        if(swapPartner){
+          const tmp=s.color;s.color=swapPartner.color;swapPartner.color=tmp;
+        }else{
+          const otherSame=nonC.find(p=>p!==s&&p.color===s.secondColor&&p.ambiguity<0.5);
+          if(otherSame){
+            const old=s.color;
+            s.color=s.secondColor;
+            otherSame.color=old;
+          }else{
+            s.color=s.secondColor;
           }
         }
-      });
 
-      let newFl='';FO.forEach(f=>{faceColors[f].forEach(x=>newFl+=C2F[x]||'?');});
-      document.getElementById('info').textContent=`修正嘗試 ${attempt+1}...`;
+        // Rebuild faceColors and facelet
+        const FO=['U','R','F','D','L','B'];
+        FO.forEach(f=>{
+          const faceStickers=nonC.filter(st=>st.face===f).sort((a,b)=>a.pos-b.pos);
+          faceColors[f]=[];
+          for(let i=0;i<9;i++){
+            if(i===4) faceColors[f].push(CC[f]);
+            else{
+              const st=faceStickers.find(s=>s.pos===i);
+              faceColors[f].push(st?st.color:'?');
+            }
+          }
+        });
+
+        let newFl='';FO.forEach(f=>{faceColors[f].forEach(x=>newFl+=C2F[x]||'?');});
+        showFacePreviews('mgrid');
+        tryAutoRepair(newFl, nonC, ambiguous, attempt+1);
+      }else{
+        document.getElementById('info').innerHTML='<span style="color:#E94560">自動修正失敗，請手動確認</span>';
+        showEditableFaces();
+        document.getElementById('btnRow').innerHTML='<button class="btn" onclick="finalizeSolve()">✅ 確認後解題</button>';
+      }
+    }, 4000);
+
+    solverCB=(err,sol)=>{
+      clearTimeout(solveTimeout);
+      if(err){
+        tryAutoRepair(fl, nonC, ambiguous, attempt+1);
+        return;
+      }
+      if(!sol||!sol.trim()){
+        document.getElementById('doneOv').classList.add('show');
+        return;
+      }
+      solution=sol.trim().split(/\s+/);
+      document.getElementById('info').innerHTML=`✅ 驗證成功！${attempt>0?'(修正了'+attempt+'次)':''}`;
       showFacePreviews('mgrid');
-      
-      tryAutoRepair(newFl, nonC, ambiguous, attempt+1);
-    }else{
-      // No more ambiguous stickers to swap
-      document.getElementById('info').innerHTML='<span style="color:#E94560">自動修正失敗，請手動確認</span>';
-      showEditableFaces();
-      document.getElementById('btnRow').innerHTML='<button class="btn" onclick="finalizeSolve()">✅ 確認後解題</button>';
-    }
-  }, 3000);
-
-  solverCB=(err,sol)=>{
-    clearTimeout(solveTimeout);
-    if(err){
-      // Error from solver (not timeout) - try next swap
-      tryAutoRepair(fl, nonC, ambiguous, attempt+1);
-      return;
-    }
-    // SUCCESS! Solver returned a solution
-    solution=sol.trim().split(/\s+/);
-    if(!sol||!sol.trim()){
-      document.getElementById('doneOv').classList.add('show');
-      return;
-    }
-    document.getElementById('info').innerHTML=`✅ 驗證成功！${attempt>0?'(修正了'+attempt+'次)':''}`;
-    showFacePreviews('mgrid');
-    document.getElementById('btnRow').innerHTML=
-      `<button class="btn" onclick="startSolveMode()">🚀 開始解題 (${solution.length} 步)</button>`;
-  };
-  solverWorker.postMessage({t:'solve',fl});
+      document.getElementById('btnRow').innerHTML=
+        `<button class="btn" onclick="startSolveMode()">🚀 開始解題 (${solution.length} 步)</button>`;
+    };
+    solverWorker.postMessage({t:'solve',fl});
+  }, 500); // brief wait for worker init
 }
 
 function startSolveMode(){
