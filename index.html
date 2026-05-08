@@ -2597,7 +2597,7 @@ function tryAutoRepair(fl, nonC, ambiguous, attempt){
       showFacePreviews('mgrid');
       document.getElementById('btnRow').innerHTML=
         `<button class="btn" onclick="startSolveMode()">🚀 模式1：最佳解 (${solution.length} 步)</button>`+
-        `<button class="btn" style="background:rgba(0,210,255,.9);margin-top:6px" onclick="startLBLMode()">📚 模式2：教學模式</button>`;
+        `<button class="btn" style="background:rgba(0,210,255,.9);margin-top:6px" onclick="startLBLMode()">📚 模式2：學習解魔方</button>`;
     };
     solverWorker.postMessage({t:'solve',fl});
   }, 500); // brief wait for worker init
@@ -2617,7 +2617,6 @@ function startSolveMode(){
 
 // ===== LBL TEACHING MODE =====
 function startLBLMode(){
-  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
   mode='lbl';
   if(vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;}
   vid.style.display='none';
@@ -2625,316 +2624,215 @@ function startLBLMode(){
   if(ov)ov.style.display='none';
   document.getElementById('botBar').style.display='none';
   document.getElementById('topBar').style.display='none';
-
-  // Detect current LBL stage
-  const stage = detectLBLStage();
-  showLBLStage(stage);
+  
+  // Show the LBL intro screen
+  showLBLIntro();
 }
 
-function detectLBLStage(){
-  const s=cubeState;
-  // Check from most advanced to least
-  if(isCubeSolved()) return 8;
-  if(isYellowCornersPositioned()) return 7; // orient corners
-  if(isYellowEdgesPositioned()) return 6;   // position corners
-  if(isYellowCrossDone_LBL()) return 5;     // position edges
-  if(isSecondLayerDone_LBL()) return 4;      // yellow cross
-  if(isFirstLayerDone_LBL()) return 3;       // second layer
-  if(isWhiteCrossDone_LBL()) return 2;       // first layer corners
-  return 1; // white cross
-}
-
-function isCubeSolved(){
-  return ['U','R','F','D','L','B'].every(f=>cubeState[f].every(c=>c===cubeState[f][4]));
-}
-function isWhiteCrossDone_LBL(){
-  const s=cubeState;
-  return s.U[1]==='W'&&s.U[3]==='W'&&s.U[5]==='W'&&s.U[7]==='W'
-    &&s.F[1]===s.F[4]&&s.R[1]===s.R[4]&&s.B[1]===s.B[4]&&s.L[1]===s.L[4];
-}
-function isFirstLayerDone_LBL(){
-  if(!isWhiteCrossDone_LBL()) return false;
-  const s=cubeState;
-  return s.U.every(c=>c==='W')
-    &&s.F[0]===s.F[4]&&s.F[2]===s.F[4]
-    &&s.R[0]===s.R[4]&&s.R[2]===s.R[4]
-    &&s.B[0]===s.B[4]&&s.B[2]===s.B[4]
-    &&s.L[0]===s.L[4]&&s.L[2]===s.L[4];
-}
-function isSecondLayerDone_LBL(){
-  if(!isFirstLayerDone_LBL()) return false;
-  const s=cubeState;
-  return s.F[3]===s.F[4]&&s.F[5]===s.F[4]
-    &&s.R[3]===s.R[4]&&s.R[5]===s.R[4]
-    &&s.B[3]===s.B[4]&&s.B[5]===s.B[4]
-    &&s.L[3]===s.L[4]&&s.L[5]===s.L[4];
-}
-function isYellowCrossDone_LBL(){
-  if(!isSecondLayerDone_LBL()) return false;
-  const s=cubeState;
-  return s.D[1]==='Y'&&s.D[3]==='Y'&&s.D[5]==='Y'&&s.D[7]==='Y';
-}
-function isYellowEdgesPositioned(){
-  if(!isYellowCrossDone_LBL()) return false;
-  const s=cubeState;
-  return s.F[7]===s.F[4]&&s.R[7]===s.R[4]&&s.B[7]===s.B[4]&&s.L[7]===s.L[4];
-}
-function isYellowCornersPositioned(){
-  if(!isYellowEdgesPositioned()) return false;
-  const s=cubeState;
-  function cornerOK(d,f1,p1,f2,p2){
-    const c=[s.D[d],s[f1][p1],s[f2][p2]].sort().join('');
-    const e=['Y',s[f1][4],s[f2][4]].sort().join('');
-    return c===e;
-  }
-  return cornerOK(0,'F',6,'L',8)&&cornerOK(2,'R',6,'F',8)
-    &&cornerOK(6,'L',6,'B',8)&&cornerOK(8,'B',6,'R',8);
-}
+// ===== REVERSE-TEACHING LBL ENGINE =====
+// From a SOLVED cube, apply controlled scrambles per stage (in reverse order 7→1)
+// Then guide the user through LBL steps to solve it back.
+// Each stage's scramble is the INVERSE of its solve algorithm.
 
 const LBL_STAGES=[
-  {n:1,name:'白色十字',icon:'✚',desc:'在上白面做出白色十字，邊塊顏色要對齊中心',formula:'直覺，不需公式'},
-  {n:2,name:'第一層角塊',icon:'🔲',desc:'用右手公式把白色角塊放到正確位置',formula:'R U R\' U\''},
-  {n:3,name:'第二層邊塊',icon:'⬛',desc:'把中間層的邊塊插入正確位置',formula:'U R U\' R\' U\' F\' U F'},
-  {n:4,name:'黃色十字',icon:'✚',desc:'在下黃面做出黃色十字',formula:'F R U R\' U\' F\''},
-  {n:5,name:'黃色邊塊歸位',icon:'🔄',desc:'讓黃色十字的邊塊顏色對齊中心',formula:'R U R\' U R U2 R\''},
-  {n:6,name:'黃色角塊歸位',icon:'📐',desc:'把黃色角塊移到正確的角落',formula:'U R U\' L\' U R\' U\' L'},
-  {n:7,name:'黃色角塊翻轉',icon:'🔁',desc:'翻轉角塊讓黃色面朝下',formula:'R\' D\' R D'},
+  {n:1,name:'白色十字',icon:'✚',desc:'在上白面排出白色十字，邊塊顏色要對齊側面中心',formula:'直覺',
+   tip:'找到白色邊塊，把它轉到上白面，讓兩面顏色都對齊'},
+  {n:2,name:'第一層角塊',icon:'🔲',desc:'用右手公式把白色角塊放到正確位置',formula:"R U R' U'",
+   tip:'把白色角塊移到它的家的正上方，重複右手公式直到歸位'},
+  {n:3,name:'第二層邊塊',icon:'⬛',desc:'把中間層的邊塊插入正確位置',formula:"U R U' R' U' F' U F",
+   tip:'找到頂層沒有黃色的邊塊，讓它遠離目標方向，再用公式插入'},
+  {n:4,name:'黃色十字',icon:'✚',desc:'在下黃面做出黃色十字',formula:"B R D R' D' B'",
+   tip:'看下黃面的圖案：圓點→L形→一字→十字，每次一個公式'},
+  {n:5,name:'黃色邊塊歸位',icon:'🔄',desc:'讓黃色十字的邊塊顏色對齊側面中心',formula:"R D R' D R D2 R'",
+   tip:'找到一個已對齊的邊，放到後面，再執行公式交換其他三邊'},
+  {n:6,name:'黃色角塊歸位',icon:'📐',desc:'把黃色角塊移到正確的角落（顏色可能還沒對）',formula:"D R D' L' D R' D' L",
+   tip:'找到一個位置正確的角，放到右前方，再執行公式交換其他三角'},
+  {n:7,name:'黃色角塊翻轉',icon:'🔁',desc:'翻轉角塊讓黃色面朝下，完成魔方！',formula:"R D R' D'",
+   tip:'把未完成的角放到右前下方，重複公式直到黃色朝下，然後只轉D換下一個角'},
 ];
 
-function showLBLStage(currentStage){
-  if(currentStage>=8){
-    document.getElementById('doneOv').classList.add('show');
-    return;
-  }
+// Generate a controlled scramble for a specific stage range
+// This creates a state where stages 1..targetStage need solving
+function generateLBLScramble(targetStage){
+  // Start from solved state
+  const s={
+    U:['W','W','W','W','W','W','W','W','W'],R:['B','B','B','B','B','B','B','B','B'],
+    F:['R','R','R','R','R','R','R','R','R'],D:['Y','Y','Y','Y','Y','Y','Y','Y','Y'],
+    L:['G','G','G','G','G','G','G','G','G'],B:['O','O','O','O','O','O','O','O','O']
+  };
+  function rotateCW(f){const a=s[f];s[f]=[a[6],a[3],a[0],a[7],a[4],a[1],a[8],a[5],a[2]];}
+  function cycle(f){let t;switch(f){case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.R[0];s.F[1]=s.R[1];s.F[2]=s.R[2];s.R[0]=s.B[0];s.R[1]=s.B[1];s.R[2]=s.B[2];s.B[0]=s.L[0];s.B[1]=s.L[1];s.B[2]=s.L[2];s.L[0]=t[0];s.L[1]=t[1];s.L[2]=t[2];break;case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.L[6];s.F[7]=s.L[7];s.F[8]=s.L[8];s.L[6]=s.B[6];s.L[7]=s.B[7];s.L[8]=s.B[8];s.B[6]=s.R[6];s.B[7]=s.R[7];s.B[8]=s.R[8];s.R[6]=t[0];s.R[7]=t[1];s.R[8]=t[2];break;case'R':t=[s.F[2],s.F[5],s.F[8]];s.F[2]=s.D[2];s.F[5]=s.D[5];s.F[8]=s.D[8];s.D[2]=s.B[6];s.D[5]=s.B[3];s.D[8]=s.B[0];s.B[0]=s.U[8];s.B[3]=s.U[5];s.B[6]=s.U[2];s.U[2]=t[0];s.U[5]=t[1];s.U[8]=t[2];break;case'L':t=[s.F[0],s.F[3],s.F[6]];s.F[0]=s.U[0];s.F[3]=s.U[3];s.F[6]=s.U[6];s.U[0]=s.B[8];s.U[3]=s.B[5];s.U[6]=s.B[2];s.B[2]=s.D[6];s.B[5]=s.D[3];s.B[8]=s.D[0];s.D[0]=t[0];s.D[3]=t[1];s.D[6]=t[2];break;case'F':t=[s.U[6],s.U[7],s.U[8]];s.U[6]=s.L[8];s.U[7]=s.L[5];s.U[8]=s.L[2];s.L[2]=s.D[0];s.L[5]=s.D[1];s.L[8]=s.D[2];s.D[0]=s.R[6];s.D[1]=s.R[3];s.D[2]=s.R[0];s.R[0]=t[0];s.R[3]=t[1];s.R[6]=t[2];break;case'B':t=[s.U[0],s.U[1],s.U[2]];s.U[0]=s.R[2];s.U[1]=s.R[5];s.U[2]=s.R[8];s.R[2]=s.D[8];s.R[5]=s.D[7];s.R[8]=s.D[6];s.D[6]=s.L[0];s.D[7]=s.L[3];s.D[8]=s.L[6];s.L[0]=t[2];s.L[3]=t[1];s.L[6]=t[0];break;}}
+  function doMove(mv){const f=mv[0],p=mv.includes("'"),d=mv.includes('2'),n=d?2:(p?3:1);for(let i=0;i<n;i++){rotateCW(f);cycle(f);}}
+  function doMoves(str){str.trim().split(/\s+/).forEach(m=>{if(m)doMove(m);});}
+  
+  const scrambleMoves=[];  // moves applied to solved cube
+  const solveMoves=[];     // the REVERSE = what user needs to do to solve
+  const stageBreaks=[];    // {stage, solveStartIdx}
 
+  // Scramble stages in reverse order (7→targetStage)
+  // Each scramble is the INVERSE of its LBL algorithm
+  
+  // Stage 7 NOT included in auto-scramble (R D R' D' temporarily breaks first 2 layers)
+  // Stage 7 is practiced separately as its own exercise
+  
+  if(targetStage<=6){
+    // Stage 6: swap corners using D R D' L' D R' D' L
+    doMoves("D R D' L' D R' D' L");
+    stageBreaks.push({stage:6, moves:"D R D' L' D R' D' L"});
+  }
+  
+  if(targetStage<=5){
+    // Stage 5: cycle edges using R D R' D R D2 R'
+    doMoves("R D R' D R D2 R'");
+    stageBreaks.push({stage:5, moves:"R D R' D R D2 R'"});
+  }
+  
+  if(targetStage<=4){
+    // Stage 4: break yellow cross using B R D R' D' B'
+    doMoves("B R D R' D' B'");
+    stageBreaks.push({stage:4, moves:"B R D R' D' B'"});
+  }
+  
+  return {state:s, stageBreaks};
+}
+
+// Show LBL intro screen with level selection
+function showLBLIntro(){
   const solveUI=document.getElementById('solveUI');
   solveUI.style.display='flex';
-
-  let html=`<div style="width:100%;max-width:360px;margin:0 auto;text-align:center">`;
-  html+=`<div style="font-size:20px;font-weight:900;color:#FFD700;margin-bottom:12px">📚 教學模式</div>`;
   
-  // Stage progress
-  html+=`<div style="display:flex;gap:4px;justify-content:center;margin-bottom:16px">`;
-  for(let i=1;i<=7;i++){
-    const done=i<currentStage;
-    const active=i===currentStage;
-    const bg=done?'rgba(0,210,255,.3)':active?'#FFD700':'rgba(255,255,255,.1)';
-    const color=done?'#00D2FF':active?'#000':'rgba(255,255,255,.3)';
-    html+=`<div style="width:32px;height:32px;border-radius:8px;background:${bg};color:${color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${i}</div>`;
-  }
-  html+=`</div>`;
+  let html='<div style="width:100%;max-width:360px;margin:0 auto;text-align:center;overflow-y:auto;padding:10px 0">';
+  html+='<div style="font-size:22px;font-weight:900;color:#FFD700;margin-bottom:4px">📚 學習解魔方</div>';
+  html+='<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;line-height:1.5">從已完成的魔方開始，用 LBL 公式一關一關練習<br>每次只打亂你要練習的部分！</div>';
 
-  // Current stage info
-  const stg=LBL_STAGES[currentStage-1];
-  html+=`<div style="background:rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:12px">`;
-  html+=`<div style="font-size:32px;margin-bottom:4px">${stg.icon}</div>`;
-  html+=`<div style="font-size:18px;font-weight:800;color:#FFD700">第 ${stg.n} 關：${stg.name}</div>`;
-  html+=`<div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:6px;line-height:1.5">${stg.desc}</div>`;
-  html+=`<div style="font-size:14px;color:#00D2FF;margin-top:8px;font-family:monospace;letter-spacing:1px">${stg.formula}</div>`;
-  html+=`</div>`;
-
-  // Current cube state preview (6 faces)
-  html+=`<div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">`;
-  ['U','R','F','D','L','B'].forEach(f=>{
-    html+=`<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.4)">${FLABEL[f]}</div>`;
-    html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">`;
-    cubeState[f].forEach(c=>{
-      html+=`<div style="width:12px;height:12px;border-radius:2px;background:${CMAP[c]||'#333'}"></div>`;
-    });
-    html+=`</div></div>`;
-  });
-  html+=`</div>`;
-
-  // Action buttons
-  html+=`<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">`;
-  html+=`<button class="btn" onclick="runLBLStage(${currentStage})">▶ 開始第 ${currentStage} 關</button>`;
-  html+=`</div>`;
+  // Level selection
+  html+='<div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:8px">選擇練習關卡</div>';
   
-  html+=`<div style="margin-top:12px">`;
-  html+=`<button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="location.reload()">🔄 我迷路了（重新掃描）</button>`;
-  html+=`</div>`;
+  // Practice only last layer (stages 4-7)
+  html+='<div style="background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="startLBLPractice(4)">';
+  html+='<div style="font-size:15px;font-weight:700;color:#FFD700">🌟 最後一層（第4-7關）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px">推薦新手！只打亂下黃層，練習4個公式</div>';
+  html+='<div style="font-size:11px;color:#00D2FF;margin-top:4px;font-family:monospace">B R D R\' D\' B\' → R D R\' D R D2 R\' → ...</div>';
+  html+='</div>';
 
-  html+=`</div>`;
+  // Practice stages 5-7
+  html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="startLBLPractice(5)">';
+  html+='<div style="font-size:14px;font-weight:700;color:#eee">🔄 邊塊+角塊（第5-7關）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">已學會黃色十字，練習歸位和翻轉</div>';
+  html+='</div>';
+
+  // Practice stage 7 only
+  html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left;opacity:0.5">';
+  html+='<div style="font-size:14px;font-weight:700;color:#eee">🔁 角塊翻轉（第7關）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">開發中 — 此關需要特殊練習模式</div>';
+  html+='</div>';
+
+  html+='<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.3);margin-bottom:8px">需要一個已還原的魔方</div>';
+  html+='<button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="location.reload()">← 返回</button>';
+  html+='</div>';
+  
+  html+='</div>';
   solveUI.innerHTML=html;
 }
 
-function runLBLStage(stageNum){
-  // Use the already-computed Kociemba solution but present with LBL stage markers
-  // The solution was already computed during tryAutoRepair
-  if(!solution||solution.length===0){
-    // Need to solve first
-    const FO=['U','R','F','D','L','B'];
-    let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
-    
-    document.getElementById('solveUI').innerHTML=
-      `<div style="text-align:center;padding:40px">
-        <div style="font-size:24px;animation:spin 1s linear infinite">⚙️</div>
-        <div style="font-size:14px;color:rgba(255,255,255,.5);margin-top:8px">計算解法中...</div>
-      </div>`;
-
-    if(solverWorker)solverWorker.terminate();
-    initSolver();
-    setTimeout(()=>{
-      solverCB=(err,sol)=>{
-        if(err||!sol||!sol.trim()){
-          document.getElementById('solveUI').innerHTML=
-            `<div style="text-align:center;padding:20px;color:#E94560">解題失敗</div>
-             <button class="btn" style="margin-top:12px" onclick="location.reload()">重新開始</button>`;
-          return;
-        }
-        solution=sol.trim().split(/\s+/);
-        launchLBLSolveUI();
-      };
-      solverWorker.postMessage({t:'solve',fl});
-    },500);
-  } else {
-    launchLBLSolveUI();
-  }
-}
-
-function launchLBLSolveUI(){
-  // Simulate all steps to find stage transition points
-  const sim={};
-  ['U','R','F','D','L','B'].forEach(f=>sim[f]=[...faceColors[f]]);
+// Start LBL practice for a given starting stage
+function startLBLPractice(fromStage){
+  const result=generateLBLScramble(fromStage);
   
-  function simMove(s,mv){
-    const f=mv[0],p=mv.includes("'"),d=mv.includes('2'),n=d?2:(p?3:1);
-    function rotCW(f){const a=s[f];s[f]=[a[6],a[3],a[0],a[7],a[4],a[1],a[8],a[5],a[2]];}
-    function cyc(f){let t;switch(f){case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.R[0];s.F[1]=s.R[1];s.F[2]=s.R[2];s.R[0]=s.B[0];s.R[1]=s.B[1];s.R[2]=s.B[2];s.B[0]=s.L[0];s.B[1]=s.L[1];s.B[2]=s.L[2];s.L[0]=t[0];s.L[1]=t[1];s.L[2]=t[2];break;case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.L[6];s.F[7]=s.L[7];s.F[8]=s.L[8];s.L[6]=s.B[6];s.L[7]=s.B[7];s.L[8]=s.B[8];s.B[6]=s.R[6];s.B[7]=s.R[7];s.B[8]=s.R[8];s.R[6]=t[0];s.R[7]=t[1];s.R[8]=t[2];break;case'R':t=[s.F[2],s.F[5],s.F[8]];s.F[2]=s.D[2];s.F[5]=s.D[5];s.F[8]=s.D[8];s.D[2]=s.B[6];s.D[5]=s.B[3];s.D[8]=s.B[0];s.B[0]=s.U[8];s.B[3]=s.U[5];s.B[6]=s.U[2];s.U[2]=t[0];s.U[5]=t[1];s.U[8]=t[2];break;case'L':t=[s.F[0],s.F[3],s.F[6]];s.F[0]=s.U[0];s.F[3]=s.U[3];s.F[6]=s.U[6];s.U[0]=s.B[8];s.U[3]=s.B[5];s.U[6]=s.B[2];s.B[2]=s.D[6];s.B[5]=s.D[3];s.B[8]=s.D[0];s.D[0]=t[0];s.D[3]=t[1];s.D[6]=t[2];break;case'F':t=[s.U[6],s.U[7],s.U[8]];s.U[6]=s.L[8];s.U[7]=s.L[5];s.U[8]=s.L[2];s.L[2]=s.D[0];s.L[5]=s.D[1];s.L[8]=s.D[2];s.D[0]=s.R[6];s.D[1]=s.R[3];s.D[2]=s.R[0];s.R[0]=t[0];s.R[3]=t[1];s.R[6]=t[2];break;case'B':t=[s.U[0],s.U[1],s.U[2]];s.U[0]=s.R[2];s.U[1]=s.R[5];s.U[2]=s.R[8];s.R[2]=s.D[8];s.R[5]=s.D[7];s.R[8]=s.D[6];s.D[6]=s.L[0];s.D[7]=s.L[3];s.D[8]=s.L[6];s.L[0]=t[2];s.L[3]=t[1];s.L[6]=t[0];break;}}
-    for(let i=0;i<n;i++){rotCW(f);cyc(f);}
-  }
+  // Build the teaching steps: for each stage, show what to do
+  const teachSteps=[];
+  const breaks=result.stageBreaks.slice().reverse(); // reverse to get stage order (4,5,6,7)
   
-  function checkStage(s){
-    const wc=s.U[1]==='W'&&s.U[3]==='W'&&s.U[5]==='W'&&s.U[7]==='W'&&s.F[1]===s.F[4]&&s.R[1]===s.R[4]&&s.B[1]===s.B[4]&&s.L[1]===s.L[4];
-    if(!wc) return 0;
-    const fl=wc&&s.U.every(c=>c==='W')&&s.F[0]===s.F[4]&&s.F[2]===s.F[4]&&s.R[0]===s.R[4]&&s.R[2]===s.R[4]&&s.B[0]===s.B[4]&&s.B[2]===s.B[4]&&s.L[0]===s.L[4]&&s.L[2]===s.L[4];
-    if(!fl) return 1;
-    const sl=fl&&s.F[3]===s.F[4]&&s.F[5]===s.F[4]&&s.R[3]===s.R[4]&&s.R[5]===s.R[4]&&s.B[3]===s.B[4]&&s.B[5]===s.B[4]&&s.L[3]===s.L[4]&&s.L[5]===s.L[4];
-    if(!sl) return 2;
-    const yc=sl&&s.D[1]==='Y'&&s.D[3]==='Y'&&s.D[5]==='Y'&&s.D[7]==='Y';
-    if(!yc) return 3;
-    const ye=yc&&s.F[7]===s.F[4]&&s.R[7]===s.R[4]&&s.B[7]===s.B[4]&&s.L[7]===s.L[4];
-    if(!ye) return 4;
-    return 5;
-  }
-  
-  // Find stage transitions
-  const stageMarkers=[]; // {stageComplete, afterStep}
-  let prevStage=checkStage(sim);
-  solution.forEach((mv,i)=>{
-    simMove(sim,mv);
-    const newStage=checkStage(sim);
-    if(newStage>prevStage){
-      stageMarkers.push({stage:newStage,afterStep:i});
-      prevStage=newStage;
-    }
+  breaks.forEach(({stage, moves})=>{
+    const stg=LBL_STAGES[stage-1];
+    const mvArr=moves.trim().split(/\s+/);
+    // The solve moves = same as scramble moves (these are self-inverse after correct reps)
+    // Actually, to undo the scramble, we reverse the move list
+    const solveMvs=mvArr.slice().reverse().map(m=>{
+      if(m.includes("'"))return m.replace("'","");
+      if(m.includes("2"))return m;
+      return m+"'";
+    });
+    teachSteps.push({stage, title:'第'+stg.n+'關：'+stg.name, desc:stg.desc, formula:stg.formula, tip:stg.tip, moves:solveMvs});
   });
   
-  // Store markers for display
-  window._lblMarkers=stageMarkers;
+  // Show the scramble instruction first
+  showLBLScrambleGuide(result.state, teachSteps, fromStage);
+}
+
+// Show the scramble instruction: tell user to set up their cube
+function showLBLScrambleGuide(targetState, teachSteps, fromStage){
+  const solveUI=document.getElementById('solveUI');
   
-  // Now use the same solve UI as mode 1, but inject stage labels
+  // Calculate the scramble moves to show the user
+  const allScrambleMoves=[];
+  const breaks=generateLBLScramble(fromStage).stageBreaks;
+  breaks.forEach(b=>allScrambleMoves.push(...b.moves.trim().split(/\s+/)));
+  
+  let html='<div style="width:100%;max-width:360px;margin:0 auto;text-align:center;overflow-y:auto;padding:10px 0">';
+  html+='<div style="font-size:18px;font-weight:900;color:#FFD700;margin-bottom:8px">🔀 準備魔方</div>';
+  html+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:12px;line-height:1.5">拿一個<b style="color:#fff">已還原</b>的魔方<br>白色朝上，紅色朝向你<br>按順序執行以下步驟打亂它：</div>';
+  
+  // Show scramble moves as step chips
+  html+='<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:12px;margin-bottom:12px">';
+  html+='<div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center">';
+  allScrambleMoves.forEach(m=>{
+    html+='<div style="background:rgba(255,215,0,.2);color:#FFD700;padding:4px 8px;border-radius:6px;font-size:13px;font-family:monospace;font-weight:700">'+m.replace("'","'")+'</div>';
+  });
+  html+='</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:6px">共 '+allScrambleMoves.length+' 步</div>';
+  html+='</div>';
+  
+  // Show target state preview
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">打亂後應該長這樣：</div>';
+  html+='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">';
+  ['U','R','F','D','L','B'].forEach(f=>{
+    html+='<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.3)">'+FLABEL[f]+'</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">';
+    targetState[f].forEach(c=>{
+      html+='<div style="width:12px;height:12px;border-radius:2px;background:'+(CMAP[c]||'#333')+'"></div>';
+    });
+    html+='</div></div>';
+  });
+  html+='</div>';
+  
+  html+='<button class="btn" onclick="startLBLSolveGuide()">✅ 我打亂好了，開始教學！</button>';
+  html+='<div style="margin-top:8px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="showLBLIntro()">← 返回選擇</button></div>';
+  html+='</div>';
+  
+  solveUI.innerHTML=html;
+  
+  // Store for later
+  window._lblTeachSteps=teachSteps;
+  window._lblTargetState=targetState;
+}
+
+// Start the guided solve
+function startLBLSolveGuide(){
+  const teachSteps=window._lblTeachSteps;
+  if(!teachSteps||teachSteps.length===0)return;
+  
+  // Flatten all moves from all stages into one solution array
+  const flatMoves=[];
+  const stageMarkers=[]; // {stage, startIdx, endIdx}
+  teachSteps.forEach(step=>{
+    const startIdx=flatMoves.length;
+    step.moves.forEach(m=>flatMoves.push(m));
+    stageMarkers.push({stage:step.stage, title:step.title, tip:step.tip, startIdx, endIdx:flatMoves.length-1});
+  });
+  
+  // Set up the standard solve UI
+  solution=flatMoves;
+  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...window._lblTargetState[f]]);
   solveStep=-1;
-  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
   mode='solve';
   window._lblMode=true;
+  window._lblMarkers=stageMarkers;
   showSolveStep();
 }
 
-let editSelColor='W';
-function showEditableFaces(){
-  const mg=document.getElementById('mgrid');
-  mg.style.display='block';mg.style.width='auto';
-  let html='<div style="display:flex;gap:6px;justify-content:center;margin-bottom:8px">';
-  'WRYOBG'.split('').forEach(c=>{
-    html+=`<div onclick="editSelColor='${c}';showEditableFaces()" style="width:28px;height:28px;border-radius:6px;background:${CMAP[c]};border:${editSelColor===c?'3px solid #fff':'2px solid rgba(255,255,255,.2)'};cursor:pointer"></div>`;
-  });
-  html+='</div>';
-  html+='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">';
-  ['U','R','F','D','L','B'].forEach(f=>{
-    const c=faceColors[f];if(!c)return;
-    html+=`<div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.5);margin-bottom:2px">${FLABEL[f]}</div>`;
-    html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">`;
-    c.forEach((x,i)=>{
-      const isCenter=i===4;
-      html+=`<div onclick="${isCenter?'':`faceColors['${f}'][${i}]=editSelColor;showEditableFaces()`}" style="width:18px;height:18px;border-radius:3px;background:${CMAP[x]||'#333'};border:1px solid rgba(255,255,255,.2);cursor:${isCenter?'default':'pointer'};${isCenter?'opacity:.6':''}"></div>`;
-    });
-    html+=`</div></div>`;
-  });
-  html+='</div>';
-  mg.innerHTML=html;
-}
 
-function finalizeSolve(){
-  const FO=['U','R','F','D','L','B'];
-  let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
-  const fcnt={};for(const ch of fl)fcnt[ch]=(fcnt[ch]||0)+1;
-  const ok=!fl.includes('?')&&Object.values(fcnt).every(v=>v===9);
-  if(!ok){
-    document.getElementById('info').innerHTML=`<span style="color:#E94560">每色需要 9 個: ${JSON.stringify(fcnt)}</span>`;
-    return;
-  }
-  doSolve(fl);
-}
-
-function showFacePreviews(targetId){
-  const el=document.getElementById(targetId);
-  el.style.display='flex';el.style.gap='4px';el.style.justifyContent='center';el.style.width='auto';
-  el.style.gridTemplateColumns='';
-  el.innerHTML=['U','R','F','D','L','B'].map(f=>{
-    const c=faceColors[f];if(!c)return'';
-    return `<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.4)">${FLABEL[f]}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:36px">${c.map(x=>`<div style="width:10px;height:10px;border-radius:2px;background:${CMAP[x]||'#333'}"></div>`).join('')}</div></div>`;
-  }).join('');
-}
-
-function showError(msg){
-  const eo=document.getElementById('errOv');eo.classList.add('show');
-  document.getElementById('errMsg').textContent=msg;
-  const ef=document.getElementById('errFaces');ef.innerHTML='';
-  ['U','R','F','D','L','B'].forEach(f=>{
-    const c=faceColors[f];if(!c)return;
-    const d=document.createElement('div');
-    d.innerHTML=`<div style="font-size:8px;color:rgba(255,255,255,.4)">${FLABEL[f]}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">${c.map(x=>`<div style="width:12px;height:12px;border-radius:2px;background:${CMAP[x]||'#333'}"></div>`).join('')}</div>`;
-    ef.appendChild(d);
-  });
-}
-
-// ===== SOLVE =====
-function doSolve(fl){
-  document.getElementById('botBar').style.display='none';
-  const solveOvEl=document.getElementById('solveOv');
-  solveOvEl.classList.add('show');
-  // Show facelet for debugging
-  solveOvEl.innerHTML=`
-    <div style="font-size:40px;animation:spin 1s linear infinite">⚙️</div>
-    <div style="font-size:16px;font-weight:800;color:#FFD700;margin-top:10px">計算最佳解中...</div>
-    <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:8px;word-break:break-all;max-width:300px;text-align:center">Facelet: ${fl}</div>
-    <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:6px" id="solveStatus">等待 solver...</div>
-    <button class="btn btn-sm" style="margin-top:12px;background:rgba(255,255,255,.15);color:#fff" onclick="location.reload()">取消</button>
-  `;
-
-  // Timeout: if solver doesn't respond in 15s, it's probably an invalid cube
-  const timeout=setTimeout(()=>{
-    solveOvEl.classList.remove('show');
-    showError('解題超時（15秒）- 魔方狀態可能無效\\nFacelet: '+fl);
-  },15000);
-
-  solverCB=(err,sol)=>{
-    clearTimeout(timeout);
-    solveOvEl.classList.remove('show');
-    if(err){showError('解題失敗: '+err.message+'\\nFacelet: '+fl);return;}
-    if(!sol||!sol.trim()){document.getElementById('doneOv').classList.add('show');return;}
-    solution=sol.trim().split(/\s+/);
-    solveStep=-1;
-    ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
-    mode='solve';
-    showSolveStep();
-  };
-  solverWorker.postMessage({t:'solve',fl});
-  document.getElementById('solveStatus').textContent='已送出，等待計算...';
-}
-
-// ===== SOLVE STEP-BY-STEP =====
 function showSolveStep(){
   document.getElementById('persp').classList.remove('show');
 
@@ -2998,19 +2896,19 @@ function showSolveStep(){
   let progText=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
   if(window._lblMode && window._lblMarkers){
     const markers=window._lblMarkers;
-    let currentLBL=0;
+    let currentStg=null;
     for(const m of markers){
-      if(solveStep<=m.afterStep){break;}
-      currentLBL=m.stage;
+      if(solveStep>=m.startIdx && solveStep<=m.endIdx){currentStg=m;break;}
     }
-    const stageNames=['白色十字','第一層角塊','第二層邊塊','黃色十字','黃色邊塊歸位','完成'];
-    if(currentLBL<stageNames.length){
-      progText=`📚 ${stageNames[currentLBL]} — 第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+    if(currentStg){
+      progText=`📚 ${currentStg.title} — 第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+      if(currentStg.tip && solveStep===currentStg.startIdx){
+        progText+=`\n💡 ${currentStg.tip}`;
+      }
     }
     // Check if this step completes a stage
-    const justCompleted=markers.find(m=>m.afterStep===solveStep);
-    if(justCompleted){
-      progText=`🎉 ${stageNames[justCompleted.stage-1]} 完成！ — 第 ${solveStep+1} 步`;
+    if(currentStg && solveStep===currentStg.endIdx){
+      progText=`🎉 ${currentStg.title} 完成！`;
     }
   }
   document.getElementById('sMoveProg').textContent=progText;
@@ -3093,116 +2991,6 @@ function showIsometricView(id, fColors, rColors){
 }
 
 // Inline SVG move diagram for solve mode
-function drawMoveDiagram(mv){
-  const face=mv[0],prime=mv.includes("'"),dbl=mv.includes('2');
-  const el=document.getElementById('sMoveVis');
-  const ac='#FFD700';
-  const n=dbl?2:1;
-  const ag=12;
-
-  // Chunky pentagon arrow (like the reference icon)
-  function mkA(svgStr,cx,cy,dx,dy,cnt){
-    const len=Math.sqrt(dx*dx+dy*dy)||1;
-    const ux=dx/len,uy=dy/len,px=-uy,py=ux;
-    // Arrow dimensions
-    const aLen=22,headW=14,bodyW=8,headLen=12,bodyLen=aLen-headLen;
-    for(let i=0;i<cnt;i++){
-      const off=(i-(cnt-1)/2)*ag;
-      const bx=cx+px*off,by=cy+py*off;
-      // 7 points: body rect + triangle head
-      // body back-left, body back-right, body front-left, head-left, tip, head-right, body front-right
-      const pts=[
-        [bx-px*bodyW, by+px*bodyW],                                    // body back-left (wrong, redo)
-      ];
-      // Simpler: define in arrow-local coords then rotate
-      // Local: arrow points in +X direction
-      // Body: rect from (-bodyLen, -bodyW/2) to (0, bodyW/2)
-      // Head: triangle from (0, -headW/2) to (headLen, 0) to (0, headW/2)
-      const local = [
-        [-bodyLen, -bodyW/2],
-        [0, -bodyW/2],
-        [0, -headW/2],
-        [headLen, 0],
-        [0, headW/2],
-        [0, bodyW/2],
-        [-bodyLen, bodyW/2],
-      ];
-      // Rotate to match (dx,dy) direction
-      const rotated = local.map(([lx,ly]) => [
-        bx + lx*ux - ly*uy,
-        by + lx*uy + ly*ux
-      ]);
-      svgStr+=`<polygon points="${rotated.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="${ac}" stroke="rgba(0,0,0,.3)" stroke-width="1" stroke-linejoin="round"/>`;
-    }
-    return svgStr;
-  }
-
-  if(face==='B'){
-    const w=180,h=160;
-    let svg=`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
-    const fs=66,cs=fs/3,fx=20,fy=35;
-    const rcw=cs*0.7,rsk=7,rx=fx+fs+3,ry=fy;
-    for(let r=0;r<3;r++)for(let c=0;c<3;c++)
-      svg+=`<rect x="${fx+c*cs+1}" y="${fy+r*cs+1}" width="${cs-2}" height="${cs-2}" rx="2" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
-    svg+=`<text x="${fx+fs/2}" y="${fy+fs+13}" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="sans-serif">前紅</text>`;
-    for(let r=0;r<3;r++)for(let c=0;c<3;c++){
-      const x=rx+c*rcw,y=ry+r*cs+c*rsk;
-      const hl=c===2;
-      const pts=[[x,y],[x+rcw-1,y+rsk],[x+rcw-1,y+cs-1+rsk],[x,y+cs-1]].map(p=>p.join(',')).join(' ');
-      svg+=`<polygon points="${pts}" fill="${hl?'rgba(255,215,0,.2)':'rgba(255,255,255,.06)'}" stroke="${hl?ac:'rgba(255,255,255,.12)'}" stroke-width="${hl?'1.5':'0.5'}"/>`;
-    }
-    svg+=`<text x="${rx+rcw*1.5}" y="${fy+fs+rsk*3+13}" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="sans-serif">右藍</text>`;
-    const arrowX=rx+rcw*2.5+rsk*2;
-    if(prime) svg=mkA(svg,arrowX,fy+fs+rsk*2+8,0,18,n);
-    else svg=mkA(svg,arrowX,fy-8,0,-18,n);
-    svg+=`</svg>`;
-    el.innerHTML=svg;
-    return;
-  }
-
-  const sz=120,cs=sz/3,pad=30;
-  const tw=sz+pad*2,th=sz+pad*2;
-  let svg=`<svg width="${tw}" height="${th}" viewBox="0 0 ${tw} ${th}">`;
-  const ox=pad,oy=pad;
-  for(let r=0;r<3;r++)for(let c=0;c<3;c++)
-    svg+=`<rect x="${ox+c*cs+1}" y="${oy+r*cs+1}" width="${cs-2}" height="${cs-2}" rx="3" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
-  const hl='rgba(255,215,0,.15)',hlS='rgba(255,215,0,.5)';
-
-  switch(face){
-    case 'R':
-      svg+=`<rect x="${ox+cs*2}" y="${oy}" width="${cs}" height="${sz}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
-      if(prime) svg=mkA(svg,ox+cs*2.5,oy+sz+8,0,18,n);
-      else svg=mkA(svg,ox+cs*2.5,oy-8,0,-18,n);
-      break;
-    case 'L':
-      svg+=`<rect x="${ox}" y="${oy}" width="${cs}" height="${sz}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
-      if(prime) svg=mkA(svg,ox+cs*0.5,oy-8,0,-18,n);
-      else svg=mkA(svg,ox+cs*0.5,oy+sz+8,0,18,n);
-      break;
-    case 'U':
-      svg+=`<rect x="${ox}" y="${oy}" width="${sz}" height="${cs}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
-      if(prime) svg=mkA(svg,ox+sz+8,oy+cs*0.5,18,0,n);
-      else svg=mkA(svg,ox-8,oy+cs*0.5,-18,0,n);
-      break;
-    case 'D':
-      svg+=`<rect x="${ox}" y="${oy+cs*2}" width="${sz}" height="${cs}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
-      if(prime) svg=mkA(svg,ox-8,oy+cs*2.5,-18,0,n);
-      else svg=mkA(svg,ox+sz+8,oy+cs*2.5,18,0,n);
-      break;
-    case 'F':
-      svg+=`<rect x="${ox}" y="${oy}" width="${sz}" height="${sz}" rx="6" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
-      if(prime){
-        svg=mkA(svg,ox-8,oy+cs*0.5,-18,0,n);
-        svg=mkA(svg,ox+sz+8,oy+cs*2.5,18,0,n);
-      }else{
-        svg=mkA(svg,ox+sz+8,oy+cs*0.5,18,0,n);
-        svg=mkA(svg,ox-8,oy+cs*2.5,-18,0,n);
-      }
-      break;
-  }
-  svg+=`</svg>`;
-  el.innerHTML=svg;
-}
 
 function nextMove(){
   solveStep++;
