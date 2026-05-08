@@ -60,20 +60,23 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
     <div class="btn-row" id="btnRow"></div>
   </div>
 
-  <!-- Solve mode UI: before grid (top), after grid (bottom) -->
-  <div id="solveUI" style="display:none">
-    <div style="position:absolute;top:0;left:0;right:0;z-index:10;background:rgba(0,0,0,.85);padding:8px 10px;text-align:center">
-      <div style="font-size:12px;color:rgba(255,255,255,.5)">操作前（前紅面）</div>
+  <!-- Solve mode UI: full black background, before/after grids + move diagram -->
+  <div id="solveUI" style="display:none;position:absolute;inset:0;z-index:10;background:#000;flex-direction:column;align-items:center;justify-content:space-between;padding:10px 16px 16px;overflow-y:auto">
+    <div style="text-align:center;width:100%">
+      <div style="font-size:11px;color:rgba(255,255,255,.4)">操作前（前紅面）</div>
       <div class="mgrid" id="beforeGrid" style="display:grid;margin:4px auto"></div>
-      <div style="font-size:24px;font-weight:900;color:#FFD700;margin-top:4px" id="sMoveLabel">-</div>
-      <div style="font-size:12px;color:#eee" id="sMoveDesc">-</div>
-      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px" id="sMoveProg">-</div>
-      <div id="sStepDots" style="margin-top:4px"></div>
     </div>
-    <div style="position:absolute;bottom:0;left:0;right:0;z-index:10;background:rgba(0,0,0,.85);padding:8px 10px 16px;text-align:center">
-      <div style="font-size:12px;color:rgba(255,255,255,.5)">操作後（前紅面應該變成）</div>
+    <div style="text-align:center;width:100%;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <div style="font-size:36px;font-weight:900;color:#FFD700;font-family:'Courier New',monospace" id="sMoveLabel">-</div>
+      <div style="font-size:15px;color:#eee;margin-top:2px" id="sMoveDesc">-</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px" id="sMoveProg">-</div>
+      <div id="sStepDots" style="margin-top:6px"></div>
+      <div id="sMoveVis" style="margin-top:10px"></div>
+    </div>
+    <div style="text-align:center;width:100%">
+      <div style="font-size:11px;color:rgba(255,255,255,.4)">操作後（前紅面應該變成）</div>
       <div class="mgrid" id="afterGrid" style="display:grid;margin:4px auto"></div>
-      <div class="btn-row" id="sBtnRow" style="margin-top:6px"></div>
+      <div class="btn-row" id="sBtnRow" style="margin-top:8px"></div>
     </div>
   </div>
 
@@ -2477,6 +2480,11 @@ function startSolveMode(){
   solveStep=-1;
   ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
   mode='solve';
+  // Stop camera, black background
+  if(vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;}
+  vid.style.display='none';
+  document.querySelector('.wrap').style.background='#000';
+  if(ov)ov.style.display='none';
   showSolveStep();
 }
 
@@ -2602,23 +2610,32 @@ function showSolveStep(){
   // Switch to solve UI
   document.getElementById('botBar').style.display='none';
   document.getElementById('topBar').style.display='none';
-  document.getElementById('solveUI').style.display='block';
+  document.getElementById('solveUI').style.display='flex';
 
   const mv=solution[solveStep];
   const face=mv[0];
+  const isB=face==='B';
 
-  // Before grid = current F face (BEFORE applying this move)
-  showGridIn('beforeGrid', cubeState['F']);
+  // Before: current state
+  if(isB){
+    showIsometricView('beforeGrid', cubeState['F'], cubeState['R']);
+  }else{
+    showGridIn('beforeGrid', cubeState['F']);
+  }
 
-  // Apply move to get "after" state (temporarily)
-  const beforeF=[...cubeState['F']];
+  // Apply move temporarily to get "after" state
   applyMove(mv);
   const afterF=[...cubeState['F']];
+  const afterR=[...cubeState['R']];
   // Undo so state stays at "before" until user clicks next
   undoMoveOnState(mv);
 
-  // After grid = expected F face AFTER this move
-  showGridIn('afterGrid', afterF);
+  // After
+  if(isB){
+    showIsometricView('afterGrid', afterF, afterR);
+  }else{
+    showGridIn('afterGrid', afterF);
+  }
 
   // Move label
   document.getElementById('sMoveLabel').textContent=mv;
@@ -2631,14 +2648,14 @@ function showSolveStep(){
     solution.map((m,i)=>`<div class="sd${i===solveStep?' now':''}${i<solveStep?' done':''}">${m.replace("'","'")}</div>`).join('')+
     `</div>`;
 
-  // Draw move overlay on camera
-  drawMoveOverlay(mv);
-
   // Perspective guide for B/D
   if(face==='B'||face==='D'){
     document.getElementById('persp').classList.add('show');
     drawPersp(mv);
   }
+
+  // Move diagram in center
+  drawMoveDiagram(mv);
 
   // Buttons
   document.getElementById('sBtnRow').innerHTML=
@@ -2651,6 +2668,98 @@ function showGridIn(id, colors){
   el.style.display='grid';el.style.width='78px';el.style.gridTemplateColumns='repeat(3,1fr)';
   el.style.gap='2px';el.style.margin='4px auto';
   el.innerHTML=colors.map(c=>`<div class="mcell" style="background:${CMAP[c]||'#333'}"></div>`).join('');
+}
+
+// Isometric F+R view for B moves: shows both faces at 45° angle
+function showIsometricView(id, fColors, rColors){
+  const el=document.getElementById(id);
+  el.style.display='block';el.style.width='auto';el.style.gridTemplateColumns='';
+  const w=160,h=120;
+  const fs=60; // face size
+  const cs=fs/3;
+  // F face: left portion, slight perspective
+  // R face: right portion, angled
+  let svg=`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
+  
+  // F face (front) - parallelogram leaning right
+  const fx=10, fy=15;
+  const skew=12; // perspective skew
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const x=fx+c*cs+r*1;
+    const y=fy+r*cs;
+    const col=CMAP[fColors[r*3+c]]||'#333';
+    svg+=`<rect x="${x}" y="${y}" width="${cs-1}" height="${cs-1}" rx="2" fill="${col}" stroke="rgba(0,0,0,.3)" stroke-width="0.5"/>`;
+  }
+  // F label
+  svg+=`<text x="${fx+fs/2}" y="${fy+fs+12}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="10" font-family="sans-serif">前紅</text>`;
+  
+  // R face (right) - parallelogram, perspective angle
+  const rx=fx+fs+4, ry=fy;
+  const rSkewX=8; // horizontal compression for perspective
+  const rSkewY=6; // vertical skew per column
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const x=rx+c*(cs-rSkewX/3)+r*1;
+    const y=ry+r*cs+c*rSkewY;
+    const cw=cs-rSkewX/3-1;
+    const ch=cs-1;
+    const col=CMAP[rColors[r*3+c]]||'#333';
+    // Use polygon for perspective
+    const pts=[
+      [x, y],
+      [x+cw, y+rSkewY/3],
+      [x+cw, y+ch+rSkewY/3],
+      [x, y+ch]
+    ].map(([px,py])=>`${px},${py}`).join(' ');
+    svg+=`<polygon points="${pts}" fill="${col}" stroke="rgba(0,0,0,.3)" stroke-width="0.5"/>`;
+  }
+  // R label
+  svg+=`<text x="${rx+30}" y="${ry+fs+rSkewY*3+12}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="10" font-family="sans-serif">右藍</text>`;
+  
+  svg+=`</svg>`;
+  el.innerHTML=svg;
+}
+
+// Inline SVG move diagram for solve mode
+function drawMoveDiagram(mv){
+  const face=mv[0],prime=mv.includes("'"),dbl=mv.includes('2');
+  const dir=prime?'↺':'↻';
+  const el=document.getElementById('sMoveVis');
+  // Draw a 3x3 grid with highlighted layer and arrow
+  const sz=120,cs=sz/3;
+  let svg=`<svg width="${sz}" height="${sz+30}" viewBox="0 0 ${sz} ${sz+30}">`;
+  // Grid cells with cube face colors
+  const fColors={F:'#B71234',U:'#fff',D:'#FFD500',R:'#0046AD',L:'#009B48',B:'#FF5800'};
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    svg+=`<rect x="${c*cs+1}" y="${r*cs+1}" width="${cs-2}" height="${cs-2}" rx="3" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.15)" stroke-width="0.5"/>`;
+  }
+  // Highlight the affected layer
+  const hl='rgba(255,215,0,.2)';
+  const hlStroke='#FFD700';
+  switch(face){
+    case'F':
+      svg+=`<rect x="0" y="0" width="${sz}" height="${sz}" rx="6" fill="${hl}" stroke="${hlStroke}" stroke-width="1.5"/>`;
+      break;
+    case'U':
+      svg+=`<rect x="0" y="0" width="${sz}" height="${cs}" rx="4" fill="${hl}" stroke="${hlStroke}" stroke-width="1.5"/>`;
+      break;
+    case'D':
+      svg+=`<rect x="0" y="${cs*2}" width="${sz}" height="${cs}" rx="4" fill="${hl}" stroke="${hlStroke}" stroke-width="1.5"/>`;
+      break;
+    case'R':
+      svg+=`<rect x="${cs*2}" y="0" width="${cs}" height="${sz}" rx="4" fill="${hl}" stroke="${hlStroke}" stroke-width="1.5"/>`;
+      break;
+    case'L':
+      svg+=`<rect x="0" y="0" width="${cs}" height="${sz}" rx="4" fill="${hl}" stroke="${hlStroke}" stroke-width="1.5"/>`;
+      break;
+    case'B':
+      svg+=`<rect x="0" y="0" width="${sz}" height="${sz}" rx="6" fill="none" stroke="${hlStroke}" stroke-width="1.5" stroke-dasharray="4"/>`;
+      break;
+  }
+  // Arrow direction text
+  const arrowTxt=dbl?'180°':dir;
+  svg+=`<text x="${sz/2}" y="${sz+20}" text-anchor="middle" fill="#FFD700" font-size="16" font-weight="bold" font-family="sans-serif">${arrowTxt}</text>`;
+  svg+=`</svg>`;
+  el.innerHTML=svg;
 }
 
 function nextMove(){
