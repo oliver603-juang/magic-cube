@@ -2759,40 +2759,86 @@ function showLBLStage(currentStage){
 }
 
 function runLBLStage(stageNum){
-  // For now: use Kociemba to solve, but show stage info
-  // TODO: Replace with proper LBL algorithms per stage
-  const stg=LBL_STAGES[stageNum-1];
-  
-  // Use Kociemba as fallback solver for all stages
-  const FO=['U','R','F','D','L','B'];
-  let fl='';FO.forEach(f=>{cubeState[f].forEach(x=>fl+=C2F[x]||'?');});
-  
-  document.getElementById('solveUI').innerHTML=
-    `<div style="text-align:center;padding:20px">
-      <div style="font-size:16px;font-weight:800;color:#FFD700">第 ${stg.n} 關：${stg.name}</div>
-      <div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px">公式：${stg.formula}</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:12px">使用最佳解引擎生成步驟...</div>
-      <div style="font-size:24px;margin-top:8px;animation:spin 1s linear infinite">⚙️</div>
-    </div>`;
+  // Use the already-computed Kociemba solution but present with LBL stage markers
+  // The solution was already computed during tryAutoRepair
+  if(!solution||solution.length===0){
+    // Need to solve first
+    const FO=['U','R','F','D','L','B'];
+    let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
+    
+    document.getElementById('solveUI').innerHTML=
+      `<div style="text-align:center;padding:40px">
+        <div style="font-size:24px;animation:spin 1s linear infinite">⚙️</div>
+        <div style="font-size:14px;color:rgba(255,255,255,.5);margin-top:8px">計算解法中...</div>
+      </div>`;
 
-  // Solve with Kociemba (full solve, but we'll present it staged)
-  if(solverWorker)solverWorker.terminate();
-  initSolver();
-  setTimeout(()=>{
-    solverCB=(err,sol)=>{
-      if(err||!sol||!sol.trim()){
-        document.getElementById('solveUI').innerHTML=
-          `<div style="text-align:center;padding:20px;color:#E94560">解題失敗</div>
-           <button class="btn" onclick="location.reload()">重新開始</button>`;
-        return;
-      }
-      solution=sol.trim().split(/\s+/);
-      solveStep=-1;
-      mode='solve';
-      showSolveStep();
-    };
-    solverWorker.postMessage({t:'solve',fl});
-  },500);
+    if(solverWorker)solverWorker.terminate();
+    initSolver();
+    setTimeout(()=>{
+      solverCB=(err,sol)=>{
+        if(err||!sol||!sol.trim()){
+          document.getElementById('solveUI').innerHTML=
+            `<div style="text-align:center;padding:20px;color:#E94560">解題失敗</div>
+             <button class="btn" style="margin-top:12px" onclick="location.reload()">重新開始</button>`;
+          return;
+        }
+        solution=sol.trim().split(/\s+/);
+        launchLBLSolveUI();
+      };
+      solverWorker.postMessage({t:'solve',fl});
+    },500);
+  } else {
+    launchLBLSolveUI();
+  }
+}
+
+function launchLBLSolveUI(){
+  // Simulate all steps to find stage transition points
+  const sim={};
+  ['U','R','F','D','L','B'].forEach(f=>sim[f]=[...faceColors[f]]);
+  
+  function simMove(s,mv){
+    const f=mv[0],p=mv.includes("'"),d=mv.includes('2'),n=d?2:(p?3:1);
+    function rotCW(f){const a=s[f];s[f]=[a[6],a[3],a[0],a[7],a[4],a[1],a[8],a[5],a[2]];}
+    function cyc(f){let t;switch(f){case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.R[0];s.F[1]=s.R[1];s.F[2]=s.R[2];s.R[0]=s.B[0];s.R[1]=s.B[1];s.R[2]=s.B[2];s.B[0]=s.L[0];s.B[1]=s.L[1];s.B[2]=s.L[2];s.L[0]=t[0];s.L[1]=t[1];s.L[2]=t[2];break;case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.L[6];s.F[7]=s.L[7];s.F[8]=s.L[8];s.L[6]=s.B[6];s.L[7]=s.B[7];s.L[8]=s.B[8];s.B[6]=s.R[6];s.B[7]=s.R[7];s.B[8]=s.R[8];s.R[6]=t[0];s.R[7]=t[1];s.R[8]=t[2];break;case'R':t=[s.F[2],s.F[5],s.F[8]];s.F[2]=s.D[2];s.F[5]=s.D[5];s.F[8]=s.D[8];s.D[2]=s.B[6];s.D[5]=s.B[3];s.D[8]=s.B[0];s.B[0]=s.U[8];s.B[3]=s.U[5];s.B[6]=s.U[2];s.U[2]=t[0];s.U[5]=t[1];s.U[8]=t[2];break;case'L':t=[s.F[0],s.F[3],s.F[6]];s.F[0]=s.U[0];s.F[3]=s.U[3];s.F[6]=s.U[6];s.U[0]=s.B[8];s.U[3]=s.B[5];s.U[6]=s.B[2];s.B[2]=s.D[6];s.B[5]=s.D[3];s.B[8]=s.D[0];s.D[0]=t[0];s.D[3]=t[1];s.D[6]=t[2];break;case'F':t=[s.U[6],s.U[7],s.U[8]];s.U[6]=s.L[8];s.U[7]=s.L[5];s.U[8]=s.L[2];s.L[2]=s.D[0];s.L[5]=s.D[1];s.L[8]=s.D[2];s.D[0]=s.R[6];s.D[1]=s.R[3];s.D[2]=s.R[0];s.R[0]=t[0];s.R[3]=t[1];s.R[6]=t[2];break;case'B':t=[s.U[0],s.U[1],s.U[2]];s.U[0]=s.R[2];s.U[1]=s.R[5];s.U[2]=s.R[8];s.R[2]=s.D[8];s.R[5]=s.D[7];s.R[8]=s.D[6];s.D[6]=s.L[0];s.D[7]=s.L[3];s.D[8]=s.L[6];s.L[0]=t[2];s.L[3]=t[1];s.L[6]=t[0];break;}}
+    for(let i=0;i<n;i++){rotCW(f);cyc(f);}
+  }
+  
+  function checkStage(s){
+    const wc=s.U[1]==='W'&&s.U[3]==='W'&&s.U[5]==='W'&&s.U[7]==='W'&&s.F[1]===s.F[4]&&s.R[1]===s.R[4]&&s.B[1]===s.B[4]&&s.L[1]===s.L[4];
+    if(!wc) return 0;
+    const fl=wc&&s.U.every(c=>c==='W')&&s.F[0]===s.F[4]&&s.F[2]===s.F[4]&&s.R[0]===s.R[4]&&s.R[2]===s.R[4]&&s.B[0]===s.B[4]&&s.B[2]===s.B[4]&&s.L[0]===s.L[4]&&s.L[2]===s.L[4];
+    if(!fl) return 1;
+    const sl=fl&&s.F[3]===s.F[4]&&s.F[5]===s.F[4]&&s.R[3]===s.R[4]&&s.R[5]===s.R[4]&&s.B[3]===s.B[4]&&s.B[5]===s.B[4]&&s.L[3]===s.L[4]&&s.L[5]===s.L[4];
+    if(!sl) return 2;
+    const yc=sl&&s.D[1]==='Y'&&s.D[3]==='Y'&&s.D[5]==='Y'&&s.D[7]==='Y';
+    if(!yc) return 3;
+    const ye=yc&&s.F[7]===s.F[4]&&s.R[7]===s.R[4]&&s.B[7]===s.B[4]&&s.L[7]===s.L[4];
+    if(!ye) return 4;
+    return 5;
+  }
+  
+  // Find stage transitions
+  const stageMarkers=[]; // {stageComplete, afterStep}
+  let prevStage=checkStage(sim);
+  solution.forEach((mv,i)=>{
+    simMove(sim,mv);
+    const newStage=checkStage(sim);
+    if(newStage>prevStage){
+      stageMarkers.push({stage:newStage,afterStep:i});
+      prevStage=newStage;
+    }
+  });
+  
+  // Store markers for display
+  window._lblMarkers=stageMarkers;
+  
+  // Now use the same solve UI as mode 1, but inject stage labels
+  solveStep=-1;
+  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
+  mode='solve';
+  window._lblMode=true;
+  showSolveStep();
 }
 
 let editSelColor='W';
@@ -2947,7 +2993,27 @@ function showSolveStep(){
   // Move label
   document.getElementById('sMoveLabel').textContent=mv;
   document.getElementById('sMoveDesc').textContent=MDESC[mv]||mv;
-  document.getElementById('sMoveProg').textContent=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+  
+  // LBL mode: show current stage label
+  let progText=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+  if(window._lblMode && window._lblMarkers){
+    const markers=window._lblMarkers;
+    let currentLBL=0;
+    for(const m of markers){
+      if(solveStep<=m.afterStep){break;}
+      currentLBL=m.stage;
+    }
+    const stageNames=['白色十字','第一層角塊','第二層邊塊','黃色十字','黃色邊塊歸位','完成'];
+    if(currentLBL<stageNames.length){
+      progText=`📚 ${stageNames[currentLBL]} — 第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+    }
+    // Check if this step completes a stage
+    const justCompleted=markers.find(m=>m.afterStep===solveStep);
+    if(justCompleted){
+      progText=`🎉 ${stageNames[justCompleted.stage-1]} 完成！ — 第 ${solveStep+1} 步`;
+    }
+  }
+  document.getElementById('sMoveProg').textContent=progText;
 
   // Step dots
   document.getElementById('sStepDots').innerHTML=
