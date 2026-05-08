@@ -2853,14 +2853,17 @@ function drawMoveDiagram(mv){
   const n=dbl?2:1;
   const ag=12;
 
+  // Big arrow helper: draws n large arrows with clear direction
   function mkA(svgStr,cx,cy,dx,dy,cnt){
     const len=Math.sqrt(dx*dx+dy*dy)||1;
     const ux=dx/len,uy=dy/len,px=-uy,py=ux;
+    const aLen=24; // longer arrow
     for(let i=0;i<cnt;i++){
       const off=(i-(cnt-1)/2)*ag;
-      const x1=cx+px*off,y1=cy+py*off,x2=cx+dx+px*off,y2=cy+dy+py*off;
-      svgStr+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${ac}" stroke-width="3" stroke-linecap="round"/>`;
-      svgStr+=`<polygon points="${x2+ux*2},${y2+uy*2} ${x2-ux*7+py*5},${y2-uy*7-px*5} ${x2-ux*7-py*5},${y2-uy*7+px*5}" fill="${ac}"/>`;
+      const x1=cx+px*off,y1=cy+py*off;
+      const x2=x1+ux*aLen,y2=y1+uy*aLen;
+      svgStr+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${ac}" stroke-width="4" stroke-linecap="round"/>`;
+      svgStr+=`<polygon points="${x2+ux*3},${y2+uy*3} ${x2-ux*9+py*7},${y2-uy*9-px*7} ${x2-ux*9-py*7},${y2-uy*9+px*7}" fill="${ac}"/>`;
     }
     return svgStr;
   }
@@ -2909,13 +2912,13 @@ function drawMoveDiagram(mv){
       break;
     case 'U':
       svg+=`<rect x="${ox}" y="${oy}" width="${sz}" height="${cs}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
-      if(prime) svg=mkA(svg,ox-8,oy+cs*0.5,-18,0,n);
-      else svg=mkA(svg,ox+sz+8,oy+cs*0.5,18,0,n);
+      if(prime) svg=mkA(svg,ox+sz+8,oy+cs*0.5,18,0,n);
+      else svg=mkA(svg,ox-8,oy+cs*0.5,-18,0,n);
       break;
     case 'D':
       svg+=`<rect x="${ox}" y="${oy+cs*2}" width="${sz}" height="${cs}" rx="4" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
-      if(prime) svg=mkA(svg,ox+sz+8,oy+cs*2.5,18,0,n);
-      else svg=mkA(svg,ox-8,oy+cs*2.5,-18,0,n);
+      if(prime) svg=mkA(svg,ox-8,oy+cs*2.5,-18,0,n);
+      else svg=mkA(svg,ox+sz+8,oy+cs*2.5,18,0,n);
       break;
     case 'F':
       svg+=`<rect x="${ox}" y="${oy}" width="${sz}" height="${sz}" rx="6" fill="${hl}" stroke="${hlS}" stroke-width="1"/>`;
