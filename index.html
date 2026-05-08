@@ -3067,10 +3067,12 @@ function showSolveStep(){
   const isB=face==='B';
 
   // Before: current state
+  const beforeF=[...cubeState['F']];
+  const beforeR=[...cubeState['R']];
   if(isB){
-    showIsometricView('beforeGrid', cubeState['F'], cubeState['R']);
+    showIsometricView('beforeGrid', beforeF, beforeR);
   }else{
-    showGridIn('beforeGrid', cubeState['F']);
+    showGridIn('beforeGrid', beforeF);
   }
 
   // Apply move temporarily to get "after" state
@@ -3080,11 +3082,20 @@ function showSolveStep(){
   // Undo so state stays at "before" until user clicks next
   undoMoveOnState(mv);
 
-  // After
+  // Compute which cells changed (for highlighting)
+  const diffF=beforeF.map((c,i)=>c!==afterF[i]);
+  const diffR=beforeR.map((c,i)=>c!==afterR[i]);
+
+  // After: show with highlights on changed cells
   if(isB){
-    showIsometricView('afterGrid', afterF, afterR);
+    showIsometricView('afterGrid', afterF, afterR, diffF, diffR);
   }else{
-    showGridIn('afterGrid', afterF);
+    showGridIn('afterGrid', afterF, diffF);
+  }
+
+  // Before grid: highlight cells that are ABOUT to move (same diff)
+  if(!isB){
+    showGridIn('beforeGrid', beforeF, diffF);
   }
 
   // Move label
@@ -3177,56 +3188,61 @@ function showSolveStep(){
     `<button class="btn" onclick="nextMove()">${solveStep>=solution.length-1?'🎉 完成！':'下一步 →'}</button>`;
 }
 
-function showGridIn(id, colors){
+function showGridIn(id, colors, highlights){
   const el=document.getElementById(id);
   el.style.display='grid';el.style.width='78px';el.style.gridTemplateColumns='repeat(3,1fr)';
   el.style.gap='2px';el.style.margin='4px auto';
-  el.innerHTML=colors.map(c=>`<div class="mcell" style="background:${CMAP[c]||'#333'}"></div>`).join('');
+  el.innerHTML=colors.map((c,i)=>{
+    const hl=highlights&&highlights[i];
+    const border=hl?'2px solid #FFD700':'1px solid rgba(0,0,0,.2)';
+    const opacity=highlights?(hl?'1':'.35'):'1';
+    const shadow=hl?'box-shadow:0 0 6px rgba(255,215,0,.6);':'';
+    const sz=hl?'width:24px;height:24px;':'';
+    return`<div class="mcell" style="background:${CMAP[c]||'#333'};border:${border};opacity:${opacity};${shadow}${sz}"></div>`;
+  }).join('');
 }
 
 // Isometric F+R view for B moves: shows both faces at 45° angle
-function showIsometricView(id, fColors, rColors){
+function showIsometricView(id, fColors, rColors, fHL, rHL){
   const el=document.getElementById(id);
   el.style.display='block';el.style.width='auto';el.style.gridTemplateColumns='';
   const w=160,h=120;
-  const fs=60; // face size
+  const fs=60;
   const cs=fs/3;
-  // F face: left portion, slight perspective
-  // R face: right portion, angled
   let svg=`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
   
-  // F face (front) - parallelogram leaning right
+  // F face (front)
   const fx=10, fy=15;
-  const skew=12; // perspective skew
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const idx=r*3+c;
     const x=fx+c*cs+r*1;
     const y=fy+r*cs;
-    const col=CMAP[fColors[r*3+c]]||'#333';
-    svg+=`<rect x="${x}" y="${y}" width="${cs-1}" height="${cs-1}" rx="2" fill="${col}" stroke="rgba(0,0,0,.3)" stroke-width="0.5"/>`;
+    const col=CMAP[fColors[idx]]||'#333';
+    const hl=fHL&&fHL[idx];
+    const op=fHL?(hl?1:.35):1;
+    const sw=hl?'stroke:#FFD700;stroke-width:2':'stroke:rgba(0,0,0,.3);stroke-width:0.5';
+    svg+=`<rect x="${x}" y="${y}" width="${cs-1}" height="${cs-1}" rx="2" fill="${col}" ${sw} opacity="${op}"/>`;
+    if(hl)svg+=`<rect x="${x-1}" y="${y-1}" width="${cs+1}" height="${cs+1}" rx="3" fill="none" stroke="rgba(255,215,0,.4)" stroke-width="1"/>`;
   }
-  // F label
   svg+=`<text x="${fx+fs/2}" y="${fy+fs+12}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="10" font-family="sans-serif">前紅</text>`;
   
-  // R face (right) - parallelogram, perspective angle
+  // R face (right) - perspective
   const rx=fx+fs+4, ry=fy;
-  const rSkewX=8; // horizontal compression for perspective
-  const rSkewY=6; // vertical skew per column
+  const rSkewX=8, rSkewY=6;
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const idx=r*3+c;
     const x=rx+c*(cs-rSkewX/3)+r*1;
     const y=ry+r*cs+c*rSkewY;
     const cw=cs-rSkewX/3-1;
     const ch=cs-1;
-    const col=CMAP[rColors[r*3+c]]||'#333';
-    // Use polygon for perspective
-    const pts=[
-      [x, y],
-      [x+cw, y+rSkewY/3],
-      [x+cw, y+ch+rSkewY/3],
-      [x, y+ch]
-    ].map(([px,py])=>`${px},${py}`).join(' ');
-    svg+=`<polygon points="${pts}" fill="${col}" stroke="rgba(0,0,0,.3)" stroke-width="0.5"/>`;
+    const col=CMAP[rColors[idx]]||'#333';
+    const hl=rHL&&rHL[idx];
+    const op=rHL?(hl?1:.35):1;
+    const sw=hl?'#FFD700':'rgba(0,0,0,.3)';
+    const sww=hl?2:0.5;
+    const pts=[[x,y],[x+cw,y+rSkewY/3],[x+cw,y+ch+rSkewY/3],[x,y+ch]].map(([px,py])=>`${px},${py}`).join(' ');
+    svg+=`<polygon points="${pts}" fill="${col}" stroke="${sw}" stroke-width="${sww}" opacity="${op}"/>`;
   }
-  // R label
   svg+=`<text x="${rx+30}" y="${ry+fs+rSkewY*3+12}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="10" font-family="sans-serif">右藍</text>`;
   
   svg+=`</svg>`;
