@@ -2292,7 +2292,9 @@ function doScanCapture(){
   scanIdx++;
   if(scanIdx>=SCAN_SEQ.length){
     // All 6 done
-    document.getElementById('info').textContent='6 面拍攝完成！';
+    document.getElementById('title').textContent='✅ 6 面拍攝完成！';
+    document.getElementById('sub').textContent='按下方按鈕分析顏色';
+    document.getElementById('info').textContent='';
     document.getElementById('btnRow').innerHTML='<button class="btn" onclick="doClassify()">🔍 分析顏色</button>';
   }else{
     // Show next face instruction directly (not as button)
@@ -2309,6 +2311,12 @@ function doScanCapture(){
 
 // ===== GLOBAL CLASSIFY + AUTO-REPAIR =====
 function doClassify(){
+  try{ doClassifyInner(); }catch(e){
+    showError('分析錯誤: '+e.message);
+    console.error(e);
+  }
+}
+function doClassifyInner(){
   const FO=['U','R','F','D','L','B'];
   const all=[];
   FO.forEach(f=>{const r=rawData[f];if(!r)return;for(let i=0;i<9;i++)all.push({face:f,pos:i,rgb:r[i],color:null});});
