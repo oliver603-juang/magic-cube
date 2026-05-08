@@ -60,6 +60,23 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
     <div class="btn-row" id="btnRow"></div>
   </div>
 
+  <!-- Solve mode UI: before grid (top), after grid (bottom) -->
+  <div id="solveUI" style="display:none">
+    <div style="position:absolute;top:0;left:0;right:0;z-index:10;background:rgba(0,0,0,.85);padding:8px 10px;text-align:center">
+      <div style="font-size:12px;color:rgba(255,255,255,.5)">操作前（前紅面）</div>
+      <div class="mgrid" id="beforeGrid" style="display:grid;margin:4px auto"></div>
+      <div style="font-size:24px;font-weight:900;color:#FFD700;margin-top:4px" id="sMoveLabel">-</div>
+      <div style="font-size:12px;color:#eee" id="sMoveDesc">-</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px" id="sMoveProg">-</div>
+      <div id="sStepDots" style="margin-top:4px"></div>
+    </div>
+    <div style="position:absolute;bottom:0;left:0;right:0;z-index:10;background:rgba(0,0,0,.85);padding:8px 10px 16px;text-align:center">
+      <div style="font-size:12px;color:rgba(255,255,255,.5)">操作後（前紅面應該變成）</div>
+      <div class="mgrid" id="afterGrid" style="display:grid;margin:4px auto"></div>
+      <div class="btn-row" id="sBtnRow" style="margin-top:6px"></div>
+    </div>
+  </div>
+
   <div class="persp" id="persp"><canvas id="perspC" width="92" height="92"></canvas></div>
 
   <!-- Start -->
@@ -2549,36 +2566,63 @@ function doSolve(fl){
 
 // ===== SOLVE STEP-BY-STEP =====
 function showSolveStep(){
-  document.getElementById('botBar').style.display='block';
   document.getElementById('persp').classList.remove('show');
 
   if(solveStep===-1){
-    // Initial: show "ready?"
+    // Initial: use botBar for "ready?" screen
+    document.getElementById('solveUI').style.display='none';
+    document.getElementById('botBar').style.display='block';
+    document.getElementById('topBar').style.display='block';
     document.getElementById('title').textContent='🧊 準備好了嗎？';
-    document.getElementById('sub').textContent='白色朝上，紅色面對鏡頭';
+    document.getElementById('sub').textContent='上白朝天，前紅對鏡頭';
     document.getElementById('dots').innerHTML='';
     document.getElementById('info').textContent=`共 ${solution.length} 步`;
-    showExpected();
-    buildStepDots();
+    showGridIn('mgrid', cubeState['F']);
+    document.getElementById('mgrid').style.display='grid';
     document.getElementById('btnRow').innerHTML='<button class="btn" onclick="nextMove()">開始第 1 步 →</button>';
     drawGuideGrid();
     return;
   }
 
   if(solveStep>=solution.length){
+    document.getElementById('solveUI').style.display='none';
     document.getElementById('doneOv').classList.add('show');
     return;
   }
 
+  // Switch to solve UI
+  document.getElementById('botBar').style.display='none';
+  document.getElementById('topBar').style.display='none';
+  document.getElementById('solveUI').style.display='block';
+
   const mv=solution[solveStep];
   const face=mv[0];
 
-  document.getElementById('title').textContent=mv;
-  document.getElementById('sub').textContent=MDESC[mv]||mv;
-  document.getElementById('info').textContent=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+  // Before grid = current F face (BEFORE applying this move)
+  showGridIn('beforeGrid', cubeState['F']);
 
-  showExpected();
-  buildStepDots();
+  // Apply move to get "after" state (temporarily)
+  const beforeF=[...cubeState['F']];
+  applyMove(mv);
+  const afterF=[...cubeState['F']];
+  // Undo so state stays at "before" until user clicks next
+  undoMoveOnState(mv);
+
+  // After grid = expected F face AFTER this move
+  showGridIn('afterGrid', afterF);
+
+  // Move label
+  document.getElementById('sMoveLabel').textContent=mv;
+  document.getElementById('sMoveDesc').textContent=MDESC[mv]||mv;
+  document.getElementById('sMoveProg').textContent=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+
+  // Step dots
+  document.getElementById('sStepDots').innerHTML=
+    `<div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:300px;margin:0 auto">`+
+    solution.map((m,i)=>`<div class="sd${i===solveStep?' now':''}${i<solveStep?' done':''}">${m.replace("'","'")}</div>`).join('')+
+    `</div>`;
+
+  // Draw move overlay on camera
   drawMoveOverlay(mv);
 
   // Perspective guide for B/D
@@ -2587,9 +2631,17 @@ function showSolveStep(){
     drawPersp(mv);
   }
 
-  document.getElementById('btnRow').innerHTML=
+  // Buttons
+  document.getElementById('sBtnRow').innerHTML=
     `<button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff" onclick="prevMove()">← 上一步</button>`+
     `<button class="btn" onclick="nextMove()">${solveStep>=solution.length-1?'🎉 完成！':'下一步 →'}</button>`;
+}
+
+function showGridIn(id, colors){
+  const el=document.getElementById(id);
+  el.style.display='grid';el.style.width='78px';el.style.gridTemplateColumns='repeat(3,1fr)';
+  el.style.gap='2px';el.style.margin='4px auto';
+  el.innerHTML=colors.map(c=>`<div class="mcell" style="background:${CMAP[c]||'#333'}"></div>`).join('');
 }
 
 function nextMove(){
@@ -2607,20 +2659,6 @@ function prevMove(){
   undoMoveOnState(solution[solveStep-1]);
   solveStep--;
   showSolveStep();
-}
-
-function showExpected(){
-  const mg=document.getElementById('mgrid');mg.style.display='grid';
-  mg.style.width='78px';mg.style.gridTemplateColumns='repeat(3,1fr)';
-  const expected=cubeState['F'];
-  mg.innerHTML=expected.map(c=>`<div class="mcell" style="background:${CMAP[c]||'#333'}"></div>`).join('');
-}
-
-function buildStepDots(){
-  document.getElementById('dots').innerHTML=
-    `<div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:300px">`+
-    solution.map((m,i)=>`<div class="sd${i===solveStep?' now':''}${i<solveStep?' done':''}">${m.replace("'","'")}</div>`).join('')+
-    `</div>`;
 }
 
 // ===== DRAW MOVE OVERLAY =====
