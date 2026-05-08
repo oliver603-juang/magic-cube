@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>魔方掃描器 v3</title>
+<title>魔方小老師</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -14,42 +14,66 @@ video{width:100%;height:100%;object-fit:cover}
 canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 canvas#sm{display:none}
 
-.hud{position:absolute;top:0;left:0;right:0;padding:12px 16px;text-align:center;z-index:10;background:linear-gradient(rgba(0,0,0,0.7),transparent);padding-bottom:30px}
-.face-lbl{font-size:20px;font-weight:900;color:#FFD700;text-shadow:0 2px 6px rgba(0,0,0,0.9)}
-.inst{font-size:14px;color:#eee;margin-top:2px;text-shadow:0 1px 4px rgba(0,0,0,0.8)}
-.dots{display:flex;justify-content:center;gap:6px;margin-top:8px}
-.dot{width:24px;height:5px;border-radius:3px;background:rgba(255,255,255,0.2)}
+/* HUD top */
+.hud{position:absolute;top:0;left:0;right:0;padding:8px 12px;text-align:center;z-index:10;background:linear-gradient(rgba(0,0,0,0.75),transparent);padding-bottom:20px}
+.title{font-size:16px;font-weight:900;color:#FFD700;text-shadow:0 2px 6px rgba(0,0,0,0.9)}
+.inst{font-size:12px;color:#ddd;margin-top:2px;text-shadow:0 1px 3px rgba(0,0,0,0.8)}
+.dots{display:flex;justify-content:center;gap:4px;margin-top:5px}
+.dot{width:18px;height:4px;border-radius:2px;background:rgba(255,255,255,0.2)}
 .dot.done{background:#00D2FF}
-.dot.active{background:#FFD700;width:36px}
+.dot.active{background:#FFD700;width:28px}
 
-.bot{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:10px 12px;background:linear-gradient(transparent,rgba(0,0,0,0.8));padding-top:30px}
-.det-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;width:100px;margin:0 auto 6px}
-.det-cell{height:28px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.3);font-size:8px;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,0.6);font-weight:700}
-.status{text-align:center;font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:4px}
-.debug{font-size:9px;color:rgba(255,255,255,0.35);text-align:center;word-break:break-all;max-height:40px;overflow:hidden}
+/* Bottom bar */
+.bot{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:6px 10px 14px;background:linear-gradient(transparent,rgba(0,0,0,0.85));padding-top:20px;text-align:center}
+.status{font-size:13px;color:rgba(255,255,255,0.8);margin-bottom:4px}
+.mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;width:72px;margin:0 auto 4px}
+.mini-cell{height:20px;border-radius:3px;border:1px solid rgba(255,255,255,0.15)}
 
-.rotate-ov{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.75);z-index:25;flex-direction:column;align-items:center;justify-content:center}
-.rotate-ov.show{display:flex}
-.rotate-ov .icon{font-size:60px;animation:rh 1.5s ease-in-out infinite}
-.rotate-ov .txt{font-size:20px;font-weight:800;margin-top:10px;color:#FFD700}
-.rotate-ov .sub{font-size:14px;color:rgba(255,255,255,0.6);margin-top:4px}
-.rotate-ov .countdown{font-size:48px;font-weight:900;color:#00D2FF;margin-top:16px}
-@keyframes rh{0%,100%{transform:rotate(0deg)}50%{transform:rotate(15deg)}}
+/* Solve mode: move instruction */
+.move-box{display:none;position:absolute;top:0;left:0;right:0;z-index:10;background:rgba(0,0,0,0.8);padding:10px 12px;text-align:center}
+.move-box.show{display:block}
+.move-face{font-size:28px;font-weight:900;color:#FFD700;font-family:'Courier New',monospace}
+.move-desc{font-size:13px;color:#eee;margin-top:2px}
+.move-prog{font-size:11px;color:rgba(255,255,255,0.5);margin-top:3px}
+.move-dots{display:flex;gap:3px;justify-content:center;margin-top:5px;flex-wrap:wrap;max-width:320px;margin-left:auto;margin-right:auto}
+.mv-d{width:14px;height:14px;border-radius:4px;font-size:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);font-family:monospace}
+.mv-d.act{background:#FFD700;color:#000}
+.mv-d.dn{background:rgba(0,210,255,0.3);color:#00D2FF}
 
-.start{position:absolute;inset:0;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;gap:12px}
-.start h1{font-size:28px;font-weight:900;color:#FFD700}
-.start p{color:rgba(255,255,255,0.6);font-size:13px;max-width:280px;text-align:center;line-height:1.5}
-.btn{padding:14px 32px;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:16px;cursor:pointer;background:#FFD700;color:#000}
+/* Perspective guide overlay for B/D moves */
+.persp-guide{display:none;position:absolute;bottom:60px;right:10px;z-index:15;width:110px;height:110px;background:rgba(0,0,0,0.7);border-radius:12px;padding:6px}
+.persp-guide.show{display:block}
+.persp-guide canvas{width:100%;height:100%}
 
-.result{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.9);z-index:30;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+/* Overlays */
+.ov-screen{display:none;position:absolute;inset:0;z-index:25;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.8)}
+.ov-screen.show{display:flex}
+.ov-icon{font-size:56px;animation:rh 1.5s ease-in-out infinite}
+.ov-txt{font-size:18px;font-weight:800;color:#FFD700;margin-top:8px}
+.ov-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:3px}
+.ov-cd{font-size:42px;font-weight:900;color:#00D2FF;margin-top:12px}
+@keyframes rh{0%,100%{transform:rotate(0deg)}50%{transform:rotate(12deg)}}
+
+.start{position:absolute;inset:0;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;gap:10px}
+.start h1{font-size:24px;font-weight:900;color:#FFD700}
+.start p{color:rgba(255,255,255,0.6);font-size:12px;max-width:260px;text-align:center;line-height:1.5}
+.btn{padding:12px 28px;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer;background:#FFD700;color:#000}
+
+.result{display:none;position:absolute;inset:0;z-index:30;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);padding:16px}
 .result.show{display:flex}
-.result h2{font-size:24px;font-weight:900;color:#FFD700;margin-bottom:8px}
-.result .msg{font-size:15px;margin-bottom:12px;text-align:center}
-.result .data{font-size:10px;color:rgba(255,255,255,0.4);word-break:break-all;margin-bottom:16px;text-align:center}
-.result .face-preview{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
-.result .mini-face{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:54px}
-.result .mini-face .mc{width:16px;height:16px;border-radius:2px}
-.result .face-title{font-size:10px;text-align:center;color:rgba(255,255,255,0.5);margin-bottom:2px}
+.result h2{font-size:22px;font-weight:900;color:#FFD700;margin-bottom:6px}
+.result .msg{font-size:14px;margin-bottom:10px;text-align:center}
+.result .faces{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:10px}
+.result .mf{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:48px}
+.result .mf-title{font-size:9px;text-align:center;color:rgba(255,255,255,0.5);margin-bottom:1px}
+.result .mc{width:14px;height:14px;border-radius:2px}
+.result .data{font-size:9px;color:rgba(255,255,255,0.3);word-break:break-all;text-align:center;margin-bottom:10px}
+
+/* Complete screen */
+.complete{display:none;position:absolute;inset:0;z-index:30;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9)}
+.complete.show{display:flex}
+.complete .big{font-size:64px;margin-bottom:10px}
+.complete h2{font-size:24px;font-weight:900;color:#00D2FF}
 </style>
 </head>
 <body>
@@ -58,41 +82,2115 @@ canvas#sm{display:none}
   <canvas id="ov"></canvas>
   <canvas id="sm"></canvas>
 
-  <div class="hud">
-    <div class="face-lbl" id="fl">準備掃描</div>
+  <!-- Scan HUD -->
+  <div class="hud" id="scanHud">
+    <div class="title" id="fl">準備掃描</div>
     <div class="inst" id="inst">白色朝上，紅色面對鏡頭</div>
     <div class="dots" id="dots"></div>
   </div>
-
   <div class="bot" id="bot" style="display:none">
     <div class="status" id="sts">對準框框，保持不動</div>
-    <div class="det-grid" id="dg" style="display:none"></div>
-    <div class="debug" id="dbg"></div>
+    <div class="mini-grid" id="dg" style="display:none"></div>
   </div>
 
-  <div class="rotate-ov" id="rotOv">
-    <div class="icon" id="rotIcon">↻</div>
-    <div class="txt" id="rotTxt">順時針轉 90°</div>
-    <div class="sub" id="rotSub">下一面：藍色中心</div>
-    <div class="countdown" id="rotCD">3</div>
+  <!-- Solve HUD -->
+  <div class="move-box" id="moveBox">
+    <div class="move-face" id="mFace">-</div>
+    <div class="move-desc" id="mDesc">-</div>
+    <div class="move-prog" id="mProg">-</div>
+    <div class="move-dots" id="mDots"></div>
   </div>
 
+  <!-- Perspective guide for B/D -->
+  <div class="persp-guide" id="perspGuide">
+    <canvas id="perspCanvas" width="100" height="100"></canvas>
+  </div>
+
+  <!-- Rotate guide overlay -->
+  <div class="ov-screen" id="rotOv">
+    <div class="ov-icon" id="rotIcon">↻</div>
+    <div class="ov-txt" id="rotTxt">-</div>
+    <div class="ov-sub" id="rotSub">-</div>
+    <div class="ov-cd" id="rotCD">3</div>
+  </div>
+
+  <!-- Solving overlay -->
+  <div class="ov-screen" id="solvingOv">
+    <div class="ov-txt">計算最佳解中...</div>
+    <div class="ov-cd" style="animation:rh 1s linear infinite">⚙</div>
+  </div>
+
+  <!-- Start screen -->
   <div class="start" id="startScr">
-    <h1>📷 魔方掃描器</h1>
-    <p>用後鏡頭掃描 6 面<br>白色朝上，紅色面對鏡頭<br>在框框中靜止 = 自動拍照</p>
+    <h1>🧊 魔方小老師</h1>
+    <p>用相機掃描 6 面 → 自動計算最佳解 → 一步步引導你還原<br><br>全程保持白色朝上！</p>
     <button class="btn" onclick="go()">開始掃描</button>
   </div>
 
+  <!-- Scan result (brief) -->
   <div class="result" id="resultScr">
-    <h2 id="resTitle">掃描結果</h2>
+    <h2 id="resTitle">-</h2>
     <div class="msg" id="resMsg"></div>
-    <div class="face-preview" id="resFaces"></div>
+    <div class="faces" id="resFaces"></div>
     <div class="data" id="resData"></div>
-    <button class="btn" id="resBtn" onclick="location.reload()">重新開始</button>
+    <button class="btn" id="resBtn">-</button>
+  </div>
+
+  <!-- Complete -->
+  <div class="complete" id="completeScr">
+    <div class="big">🎉</div>
+    <h2>魔方還原完成！</h2>
+    <p style="color:rgba(255,255,255,0.6);margin-top:8px;font-size:14px">你太厲害了！</p>
+    <button class="btn" style="margin-top:16px" onclick="location.reload()">再來一次</button>
   </div>
 </div>
 
+<!-- Cubejs solver library -->
+<script id="cubejs-src" type="text/plain">
+(function() {
+  // Centers
+  var B, BL, BR, Cube, D, DB, DBL, DF, DFR, DL, DLF, DR, DRB, F, FL, FR, L, R, U, UB, UBR, UF, UFL, UL, ULB, UR, URF, centerColor, centerFacelet, cornerColor, cornerFacelet, edgeColor, edgeFacelet;
+
+  [U, R, F, D, L, B] = [0, 1, 2, 3, 4, 5];
+
+  // Corners
+  [URF, UFL, ULB, UBR, DFR, DLF, DBL, DRB] = [0, 1, 2, 3, 4, 5, 6, 7];
+
+  // Edges
+  [UR, UF, UL, UB, DR, DF, DL, DB, FR, FL, BL, BR] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+  [centerFacelet, cornerFacelet, edgeFacelet] = (function() {
+    var _B, _D, _F, _L, _R, _U;
+    _U = function(x) {
+      return x - 1;
+    };
+    _R = function(x) {
+      return _U(9) + x;
+    };
+    _F = function(x) {
+      return _R(9) + x;
+    };
+    _D = function(x) {
+      return _F(9) + x;
+    };
+    _L = function(x) {
+      return _D(9) + x;
+    };
+    _B = function(x) {
+      return _L(9) + x;
+    };
+    return [
+      // Centers
+      [4,
+      13,
+      22,
+      31,
+      40,
+      49],
+      // Corners
+      [[_U(9),
+      _R(1),
+      _F(3)],
+      [_U(7),
+      _F(1),
+      _L(3)],
+      [_U(1),
+      _L(1),
+      _B(3)],
+      [_U(3),
+      _B(1),
+      _R(3)],
+      [_D(3),
+      _F(9),
+      _R(7)],
+      [_D(1),
+      _L(9),
+      _F(7)],
+      [_D(7),
+      _B(9),
+      _L(7)],
+      [_D(9),
+      _R(9),
+      _B(7)]],
+      // Edges
+      [[_U(6),
+      _R(2)],
+      [_U(8),
+      _F(2)],
+      [_U(4),
+      _L(2)],
+      [_U(2),
+      _B(2)],
+      [_D(6),
+      _R(8)],
+      [_D(2),
+      _F(8)],
+      [_D(4),
+      _L(8)],
+      [_D(8),
+      _B(8)],
+      [_F(6),
+      _R(4)],
+      [_F(4),
+      _L(6)],
+      [_B(6),
+      _L(4)],
+      [_B(4),
+      _R(6)]]
+    ];
+  })();
+
+  centerColor = ['U', 'R', 'F', 'D', 'L', 'B'];
+
+  cornerColor = [['U', 'R', 'F'], ['U', 'F', 'L'], ['U', 'L', 'B'], ['U', 'B', 'R'], ['D', 'F', 'R'], ['D', 'L', 'F'], ['D', 'B', 'L'], ['D', 'R', 'B']];
+
+  edgeColor = [['U', 'R'], ['U', 'F'], ['U', 'L'], ['U', 'B'], ['D', 'R'], ['D', 'F'], ['D', 'L'], ['D', 'B'], ['F', 'R'], ['F', 'L'], ['B', 'L'], ['B', 'R']];
+
+  Cube = (function() {
+    var faceNames, faceNums, parseAlg;
+
+    class Cube {
+      constructor(other) {
+        var x;
+        if (other != null) {
+          this.init(other);
+        } else {
+          this.identity();
+        }
+        // For moves to avoid allocating new objects each time
+        this.newCenter = (function() {
+          var k, results;
+          results = [];
+          for (x = k = 0; k <= 5; x = ++k) {
+            results.push(0);
+          }
+          return results;
+        })();
+        this.newCp = (function() {
+          var k, results;
+          results = [];
+          for (x = k = 0; k <= 7; x = ++k) {
+            results.push(0);
+          }
+          return results;
+        })();
+        this.newEp = (function() {
+          var k, results;
+          results = [];
+          for (x = k = 0; k <= 11; x = ++k) {
+            results.push(0);
+          }
+          return results;
+        })();
+        this.newCo = (function() {
+          var k, results;
+          results = [];
+          for (x = k = 0; k <= 7; x = ++k) {
+            results.push(0);
+          }
+          return results;
+        })();
+        this.newEo = (function() {
+          var k, results;
+          results = [];
+          for (x = k = 0; k <= 11; x = ++k) {
+            results.push(0);
+          }
+          return results;
+        })();
+      }
+
+      init(state) {
+        this.center = state.center.slice(0);
+        this.co = state.co.slice(0);
+        this.ep = state.ep.slice(0);
+        this.cp = state.cp.slice(0);
+        return this.eo = state.eo.slice(0);
+      }
+
+      identity() {
+        var x;
+        // Initialize to the identity cube
+        this.center = [0, 1, 2, 3, 4, 5];
+        this.cp = [0, 1, 2, 3, 4, 5, 6, 7];
+        this.co = (function() {
+          var k, results;
+          results = [];
+          for (x = k = 0; k <= 7; x = ++k) {
+            results.push(0);
+          }
+          return results;
+        })();
+        this.ep = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+        return this.eo = (function() {
+          var k, results;
+          results = [];
+          for (x = k = 0; k <= 11; x = ++k) {
+            results.push(0);
+          }
+          return results;
+        })();
+      }
+
+      toJSON() {
+        return {
+          center: this.center,
+          cp: this.cp,
+          co: this.co,
+          ep: this.ep,
+          eo: this.eo
+        };
+      }
+
+      asString() {
+        var corner, edge, i, k, l, m, n, o, ori, p, result;
+        result = [];
+        for (i = k = 0; k <= 5; i = ++k) {
+          result[9 * i + 4] = centerColor[this.center[i]];
+        }
+        for (i = l = 0; l <= 7; i = ++l) {
+          corner = this.cp[i];
+          ori = this.co[i];
+          for (n = m = 0; m <= 2; n = ++m) {
+            result[cornerFacelet[i][(n + ori) % 3]] = cornerColor[corner][n];
+          }
+        }
+        for (i = o = 0; o <= 11; i = ++o) {
+          edge = this.ep[i];
+          ori = this.eo[i];
+          for (n = p = 0; p <= 1; n = ++p) {
+            result[edgeFacelet[i][(n + ori) % 2]] = edgeColor[edge][n];
+          }
+        }
+        return result.join('');
+      }
+
+      static fromString(str) {
+        var col1, col2, cube, i, j, k, l, m, o, ori, p, q, r, ref;
+        cube = new Cube;
+        for (i = k = 0; k <= 5; i = ++k) {
+          for (j = l = 0; l <= 5; j = ++l) {
+            if (str[9 * i + 4] === centerColor[j]) {
+              cube.center[i] = j;
+            }
+          }
+        }
+        for (i = m = 0; m <= 7; i = ++m) {
+          for (ori = o = 0; o <= 2; ori = ++o) {
+            if ((ref = str[cornerFacelet[i][ori]]) === 'U' || ref === 'D') {
+              break;
+            }
+          }
+          col1 = str[cornerFacelet[i][(ori + 1) % 3]];
+          col2 = str[cornerFacelet[i][(ori + 2) % 3]];
+          for (j = p = 0; p <= 7; j = ++p) {
+            if (col1 === cornerColor[j][1] && col2 === cornerColor[j][2]) {
+              cube.cp[i] = j;
+              cube.co[i] = ori % 3;
+            }
+          }
+        }
+        for (i = q = 0; q <= 11; i = ++q) {
+          for (j = r = 0; r <= 11; j = ++r) {
+            if (str[edgeFacelet[i][0]] === edgeColor[j][0] && str[edgeFacelet[i][1]] === edgeColor[j][1]) {
+              cube.ep[i] = j;
+              cube.eo[i] = 0;
+              break;
+            }
+            if (str[edgeFacelet[i][0]] === edgeColor[j][1] && str[edgeFacelet[i][1]] === edgeColor[j][0]) {
+              cube.ep[i] = j;
+              cube.eo[i] = 1;
+              break;
+            }
+          }
+        }
+        return cube;
+      }
+
+      clone() {
+        return new Cube(this.toJSON());
+      }
+
+      // A class method returning a new random cube
+      static random() {
+        return new Cube().randomize();
+      }
+
+      isSolved() {
+        var c, cent, clone, e, k, l, m;
+        clone = this.clone();
+        clone.move(clone.upright());
+        for (cent = k = 0; k <= 5; cent = ++k) {
+          if (clone.center[cent] !== cent) {
+            return false;
+          }
+        }
+        for (c = l = 0; l <= 7; c = ++l) {
+          if (clone.cp[c] !== c) {
+            return false;
+          }
+          if (clone.co[c] !== 0) {
+            return false;
+          }
+        }
+        for (e = m = 0; m <= 11; e = ++m) {
+          if (clone.ep[e] !== e) {
+            return false;
+          }
+          if (clone.eo[e] !== 0) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      // Multiply this Cube with another Cube, restricted to centers.
+      centerMultiply(other) {
+        var from, k, to;
+        for (to = k = 0; k <= 5; to = ++k) {
+          from = other.center[to];
+          this.newCenter[to] = this.center[from];
+        }
+        [this.center, this.newCenter] = [this.newCenter, this.center];
+        return this;
+      }
+
+      // Multiply this Cube with another Cube, restricted to corners.
+      cornerMultiply(other) {
+        var from, k, to;
+        for (to = k = 0; k <= 7; to = ++k) {
+          from = other.cp[to];
+          this.newCp[to] = this.cp[from];
+          this.newCo[to] = (this.co[from] + other.co[to]) % 3;
+        }
+        [this.cp, this.newCp] = [this.newCp, this.cp];
+        [this.co, this.newCo] = [this.newCo, this.co];
+        return this;
+      }
+
+      // Multiply this Cube with another Cube, restricted to edges
+      edgeMultiply(other) {
+        var from, k, to;
+        for (to = k = 0; k <= 11; to = ++k) {
+          from = other.ep[to];
+          this.newEp[to] = this.ep[from];
+          this.newEo[to] = (this.eo[from] + other.eo[to]) % 2;
+        }
+        [this.ep, this.newEp] = [this.newEp, this.ep];
+        [this.eo, this.newEo] = [this.newEo, this.eo];
+        return this;
+      }
+
+      // Multiply this cube with another Cube
+      multiply(other) {
+        this.centerMultiply(other);
+        this.cornerMultiply(other);
+        this.edgeMultiply(other);
+        return this;
+      }
+
+      move(arg) {
+        var face, k, l, len, move, power, ref, ref1, x;
+        ref = parseAlg(arg);
+        for (k = 0, len = ref.length; k < len; k++) {
+          move = ref[k];
+          face = move / 3 | 0;
+          power = move % 3;
+          for (x = l = 0, ref1 = power; (0 <= ref1 ? l <= ref1 : l >= ref1); x = 0 <= ref1 ? ++l : --l) {
+            this.multiply(Cube.moves[face]);
+          }
+        }
+        return this;
+      }
+
+      upright() {
+        var clone, i, j, k, l, result;
+        clone = this.clone();
+        result = [];
+        for (i = k = 0; k <= 5; i = ++k) {
+          if (clone.center[i] === F) {
+            break;
+          }
+        }
+        switch (i) {
+          case D:
+            result.push("x");
+            break;
+          case U:
+            result.push("x'");
+            break;
+          case B:
+            result.push("x2");
+            break;
+          case R:
+            result.push("y");
+            break;
+          case L:
+            result.push("y'");
+        }
+        if (result.length) {
+          clone.move(result[0]);
+        }
+        for (j = l = 0; l <= 5; j = ++l) {
+          if (clone.center[j] === U) {
+            break;
+          }
+        }
+        switch (j) {
+          case L:
+            result.push("z");
+            break;
+          case R:
+            result.push("z'");
+            break;
+          case D:
+            result.push("z2");
+        }
+        return result.join(' ');
+      }
+
+      static inverse(arg) {
+        var face, k, len, move, power, result, str;
+        result = (function() {
+          var k, len, ref, results;
+          ref = parseAlg(arg);
+          results = [];
+          for (k = 0, len = ref.length; k < len; k++) {
+            move = ref[k];
+            face = move / 3 | 0;
+            power = move % 3;
+            results.push(face * 3 + -(power - 1) + 1);
+          }
+          return results;
+        })();
+        result.reverse();
+        if (typeof arg === 'string') {
+          str = '';
+          for (k = 0, len = result.length; k < len; k++) {
+            move = result[k];
+            face = move / 3 | 0;
+            power = move % 3;
+            str += faceNames[face];
+            if (power === 1) {
+              str += '2';
+            } else if (power === 2) {
+              str += "'";
+            }
+            str += ' ';
+          }
+          return str.substring(0, str.length - 1);
+        } else if (arg.length != null) {
+          return result;
+        } else {
+          return result[0];
+        }
+      }
+
+    };
+
+    Cube.prototype.randomize = (function() {
+      var arePermutationsValid, generateValidRandomOrientation, generateValidRandomPermutation, getNumSwaps, isOrientationValid, randint, randomizeOrientation, result, shuffle;
+      randint = function(min, max) {
+        return min + Math.floor(Math.random() * (max - min + 1));
+      };
+      // Fisher-Yates shuffle adapted from https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
+      shuffle = function(array) {
+        var currentIndex, randomIndex, temporaryValue;
+        currentIndex = array.length;
+        // While there remain elements to shuffle...
+        while (currentIndex !== 0) {
+          // Pick a remaining element...
+          randomIndex = randint(0, currentIndex - 1);
+          currentIndex -= 1;
+          // And swap it with the current element.
+          temporaryValue = array[currentIndex];
+          [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+        }
+      };
+      getNumSwaps = function(arr) {
+        var cur, cycleLength, i, k, numSwaps, ref, seen, x;
+        numSwaps = 0;
+        seen = (function() {
+          var k, ref, results;
+          results = [];
+          for (x = k = 0, ref = arr.length - 1; (0 <= ref ? k <= ref : k >= ref); x = 0 <= ref ? ++k : --k) {
+            results.push(false);
+          }
+          return results;
+        })();
+        while (true) {
+          // We compute the cycle decomposition
+          cur = -1;
+          for (i = k = 0, ref = arr.length - 1; (0 <= ref ? k <= ref : k >= ref); i = 0 <= ref ? ++k : --k) {
+            if (!seen[i]) {
+              cur = i;
+              break;
+            }
+          }
+          if (cur === -1) {
+            break;
+          }
+          cycleLength = 0;
+          while (!seen[cur]) {
+            seen[cur] = true;
+            cycleLength++;
+            cur = arr[cur];
+          }
+          // A cycle is equivalent to cycleLength + 1 swaps
+          numSwaps += cycleLength + 1;
+        }
+        return numSwaps;
+      };
+      arePermutationsValid = function(cp, ep) {
+        var numSwaps;
+        numSwaps = getNumSwaps(ep) + getNumSwaps(cp);
+        return numSwaps % 2 === 0;
+      };
+      generateValidRandomPermutation = function(cp, ep) {
+        // Each shuffle only takes around 12 operations and there's a 50%
+        // chance of a valid permutation so it'll finish in very good time
+        shuffle(ep);
+        shuffle(cp);
+        while (!arePermutationsValid(cp, ep)) {
+          shuffle(ep);
+          shuffle(cp);
+        }
+      };
+      randomizeOrientation = function(arr, numOrientations) {
+        var i, k, ori, ref;
+        ori = 0;
+        for (i = k = 0, ref = arr.length - 1; (0 <= ref ? k <= ref : k >= ref); i = 0 <= ref ? ++k : --k) {
+          ori += (arr[i] = randint(0, numOrientations - 1));
+        }
+      };
+      isOrientationValid = function(arr, numOrientations) {
+        return arr.reduce(function(a, b) {
+          return a + b;
+        }) % numOrientations === 0;
+      };
+      generateValidRandomOrientation = function(co, eo) {
+        // There is a 1/2 and 1/3 probably respectively of each of these
+        // succeeding so the probability of them running 10 times before
+        // success is already only 1% and only gets exponentially lower
+        // and each generation is only in the 10s of operations which is nothing
+        randomizeOrientation(co, 3);
+        while (!isOrientationValid(co, 3)) {
+          randomizeOrientation(co, 3);
+        }
+        randomizeOrientation(eo, 2);
+        while (!isOrientationValid(eo, 2)) {
+          randomizeOrientation(eo, 2);
+        }
+      };
+      result = function() {
+        generateValidRandomPermutation(this.cp, this.ep);
+        generateValidRandomOrientation(this.co, this.eo);
+        return this;
+      };
+      return result;
+    })();
+
+    Cube.moves = [
+      {
+        // U
+        center: [0, 1, 2, 3, 4, 5],
+        cp: [UBR,
+      URF,
+      UFL,
+      ULB,
+      DFR,
+      DLF,
+      DBL,
+      DRB],
+        co: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0],
+        ep: [UB,
+      UR,
+      UF,
+      UL,
+      DR,
+      DF,
+      DL,
+      DB,
+      FR,
+      FL,
+      BL,
+      BR],
+        eo: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0]
+      },
+      {
+        // R
+        center: [0, 1, 2, 3, 4, 5],
+        cp: [DFR,
+      UFL,
+      ULB,
+      URF,
+      DRB,
+      DLF,
+      DBL,
+      UBR],
+        co: [2,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      2],
+        ep: [FR,
+      UF,
+      UL,
+      UB,
+      BR,
+      DF,
+      DL,
+      DB,
+      DR,
+      FL,
+      BL,
+      UR],
+        eo: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0]
+      },
+      {
+        // F
+        center: [0, 1, 2, 3, 4, 5],
+        cp: [UFL,
+      DLF,
+      ULB,
+      UBR,
+      URF,
+      DFR,
+      DBL,
+      DRB],
+        co: [1,
+      2,
+      0,
+      0,
+      2,
+      1,
+      0,
+      0],
+        ep: [UR,
+      FL,
+      UL,
+      UB,
+      DR,
+      FR,
+      DL,
+      DB,
+      UF,
+      DF,
+      BL,
+      BR],
+        eo: [0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0]
+      },
+      {
+        // D
+        center: [0, 1, 2, 3, 4, 5],
+        cp: [URF,
+      UFL,
+      ULB,
+      UBR,
+      DLF,
+      DBL,
+      DRB,
+      DFR],
+        co: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0],
+        ep: [UR,
+      UF,
+      UL,
+      UB,
+      DF,
+      DL,
+      DB,
+      DR,
+      FR,
+      FL,
+      BL,
+      BR],
+        eo: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0]
+      },
+      {
+        // L
+        center: [0, 1, 2, 3, 4, 5],
+        cp: [URF,
+      ULB,
+      DBL,
+      UBR,
+      DFR,
+      UFL,
+      DLF,
+      DRB],
+        co: [0,
+      1,
+      2,
+      0,
+      0,
+      2,
+      1,
+      0],
+        ep: [UR,
+      UF,
+      BL,
+      UB,
+      DR,
+      DF,
+      FL,
+      DB,
+      FR,
+      UL,
+      DL,
+      BR],
+        eo: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0]
+      },
+      {
+        // B
+        center: [0, 1, 2, 3, 4, 5],
+        cp: [URF,
+      UFL,
+      UBR,
+      DRB,
+      DFR,
+      DLF,
+      ULB,
+      DBL],
+        co: [0,
+      0,
+      1,
+      2,
+      0,
+      0,
+      2,
+      1],
+        ep: [UR,
+      UF,
+      UL,
+      BR,
+      DR,
+      DF,
+      DL,
+      BL,
+      FR,
+      FL,
+      UB,
+      DB],
+        eo: [0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      1]
+      },
+      {
+        // E
+        center: [U,
+      F,
+      L,
+      D,
+      B,
+      R],
+        cp: [URF,
+      UFL,
+      ULB,
+      UBR,
+      DFR,
+      DLF,
+      DBL,
+      DRB],
+        co: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0],
+        ep: [UR,
+      UF,
+      UL,
+      UB,
+      DR,
+      DF,
+      DL,
+      DB,
+      FL,
+      BL,
+      BR,
+      FR],
+        eo: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1]
+      },
+      {
+        // M
+        center: [B,
+      R,
+      U,
+      F,
+      L,
+      D],
+        cp: [URF,
+      UFL,
+      ULB,
+      UBR,
+      DFR,
+      DLF,
+      DBL,
+      DRB],
+        co: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0],
+        ep: [UR,
+      UB,
+      UL,
+      DB,
+      DR,
+      UF,
+      DL,
+      DF,
+      FR,
+      FL,
+      BL,
+      BR],
+        eo: [0,
+      1,
+      0,
+      1,
+      0,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0]
+      },
+      {
+        // S
+        center: [L,
+      U,
+      F,
+      R,
+      D,
+      B],
+        cp: [URF,
+      UFL,
+      ULB,
+      UBR,
+      DFR,
+      DLF,
+      DBL,
+      DRB],
+        co: [0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0],
+        ep: [UL,
+      UF,
+      DL,
+      UB,
+      UR,
+      DF,
+      DR,
+      DB,
+      FR,
+      FL,
+      BL,
+      BR],
+        eo: [1,
+      0,
+      1,
+      0,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0]
+      }
+    ];
+
+    faceNums = {
+      U: 0,
+      R: 1,
+      F: 2,
+      D: 3,
+      L: 4,
+      B: 5,
+      E: 6,
+      M: 7,
+      S: 8,
+      x: 9,
+      y: 10,
+      z: 11,
+      u: 12,
+      r: 13,
+      f: 14,
+      d: 15,
+      l: 16,
+      b: 17
+    };
+
+    faceNames = {
+      0: 'U',
+      1: 'R',
+      2: 'F',
+      3: 'D',
+      4: 'L',
+      5: 'B',
+      6: 'E',
+      7: 'M',
+      8: 'S',
+      9: 'x',
+      10: 'y',
+      11: 'z',
+      12: 'u',
+      13: 'r',
+      14: 'f',
+      15: 'd',
+      16: 'l',
+      17: 'b'
+    };
+
+    parseAlg = function(arg) {
+      var k, len, move, part, power, ref, results;
+      if (typeof arg === 'string') {
+        ref = arg.split(/\s+/);
+        // String
+        results = [];
+        for (k = 0, len = ref.length; k < len; k++) {
+          part = ref[k];
+          if (part.length === 0) {
+            // First and last can be empty
+            continue;
+          }
+          if (part.length > 2) {
+            throw new Error(`Invalid move: ${part}`);
+          }
+          move = faceNums[part[0]];
+          if (move === void 0) {
+            throw new Error(`Invalid move: ${part}`);
+          }
+          if (part.length === 1) {
+            power = 0;
+          } else {
+            if (part[1] === '2') {
+              power = 1;
+            } else if (part[1] === "'") {
+              power = 2;
+            } else {
+              throw new Error(`Invalid move: ${part}`);
+            }
+          }
+          results.push(move * 3 + power);
+        }
+        return results;
+      } else if (arg.length != null) {
+        // Already an array
+        return arg;
+      } else {
+        // A single move
+        return [arg];
+      }
+    };
+
+    // x
+    Cube.moves.push(new Cube().move("R M' L'").toJSON());
+
+    // y
+    Cube.moves.push(new Cube().move("U E' D'").toJSON());
+
+    // z
+    Cube.moves.push(new Cube().move("F S B'").toJSON());
+
+    // u
+    Cube.moves.push(new Cube().move("U E'").toJSON());
+
+    // r
+    Cube.moves.push(new Cube().move("R M'").toJSON());
+
+    // f
+    Cube.moves.push(new Cube().move("F S").toJSON());
+
+    // d
+    Cube.moves.push(new Cube().move("D E").toJSON());
+
+    // l
+    Cube.moves.push(new Cube().move("L M").toJSON());
+
+    // b
+    Cube.moves.push(new Cube().move("B S'").toJSON());
+
+    return Cube;
+
+  }).call(this);
+
+  //# Globals
+  if (typeof window !== "undefined") {
+    window.Cube = Cube;
+  } else if (typeof module !== "undefined" && module !== null) {
+    module.exports = Cube;
+  } else {
+    this.Cube = Cube;
+  }
+
+}).call(this);
+
+;
+(function() {
+  var B, BL, BR, Cnk, Cube, D, DB, DBL, DF, DFR, DL, DLF, DR, DRB, F, FL, FR, Include, L, N_FLIP, N_FRtoBR, N_PARITY, N_SLICE1, N_SLICE2, N_TWIST, N_UBtoDF, N_URFtoDLF, N_URtoDF, N_URtoUL, R, U, UB, UBR, UF, UFL, UL, ULB, UR, URF, allMoves1, allMoves2, computeMoveTable, computePruningTable, faceNames, faceNums, factorial, key, max, mergeURtoDF, moveTableParams, nextMoves1, nextMoves2, permutationIndex, pruning, pruningTableParams, rotateLeft, rotateRight, value,
+    indexOf = [].indexOf;
+
+  Cube = (typeof window !== 'undefined' ? window.Cube : null) || this.Cube || require('./cube');
+
+  // Centers
+  [U, R, F, D, L, B] = [0, 1, 2, 3, 4, 5];
+
+  // Corners
+  [URF, UFL, ULB, UBR, DFR, DLF, DBL, DRB] = [0, 1, 2, 3, 4, 5, 6, 7];
+
+  // Edges
+  [UR, UF, UL, UB, DR, DF, DL, DB, FR, FL, BL, BR] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+  //# Helpers
+
+  // n choose k, i.e. the binomial coeffiecient
+  Cnk = function(n, k) {
+    var i, j, s;
+    if (n < k) {
+      return 0;
+    }
+    if (k > n / 2) {
+      k = n - k;
+    }
+    s = 1;
+    i = n;
+    j = 1;
+    while (i !== n - k) {
+      s *= i;
+      s /= j;
+      i--;
+      j++;
+    }
+    return s;
+  };
+
+  // n!
+  factorial = function(n) {
+    var f, i, m, ref;
+    f = 1;
+    for (i = m = 2, ref = n; (2 <= ref ? m <= ref : m >= ref); i = 2 <= ref ? ++m : --m) {
+      f *= i;
+    }
+    return f;
+  };
+
+  // Maximum of two values
+  max = function(a, b) {
+    if (a > b) {
+      return a;
+    } else {
+      return b;
+    }
+  };
+
+  // Rotate elements between l and r left by one place
+  rotateLeft = function(array, l, r) {
+    var i, m, ref, ref1, tmp;
+    tmp = array[l];
+    for (i = m = ref = l, ref1 = r - 1; (ref <= ref1 ? m <= ref1 : m >= ref1); i = ref <= ref1 ? ++m : --m) {
+      array[i] = array[i + 1];
+    }
+    return array[r] = tmp;
+  };
+
+  // Rotate elements between l and r right by one place
+  rotateRight = function(array, l, r) {
+    var i, m, ref, ref1, tmp;
+    tmp = array[r];
+    for (i = m = ref = r, ref1 = l + 1; (ref <= ref1 ? m <= ref1 : m >= ref1); i = ref <= ref1 ? ++m : --m) {
+      array[i] = array[i - 1];
+    }
+    return array[l] = tmp;
+  };
+
+  // Generate a function that computes permutation indices.
+
+  // The permutation index actually encodes two indices: Combination,
+  // i.e. positions of the cubies start..end (A) and their respective
+  // permutation (B). The maximum value for B is
+
+  //   maxB = (end - start + 1)!
+
+  // and the index is A * maxB + B
+  permutationIndex = function(context, start, end, fromEnd = false) {
+    var i, maxAll, maxB, maxOur, our, permName;
+    maxOur = end - start;
+    maxB = factorial(maxOur + 1);
+    if (context === 'corners') {
+      maxAll = 7;
+      permName = 'cp';
+    } else {
+      maxAll = 11;
+      permName = 'ep';
+    }
+    our = (function() {
+      var m, ref, results;
+      results = [];
+      for (i = m = 0, ref = maxOur; (0 <= ref ? m <= ref : m >= ref); i = 0 <= ref ? ++m : --m) {
+        results.push(0);
+      }
+      return results;
+    })();
+    return function(index) {
+      var a, b, c, j, k, m, o, p, perm, q, ref, ref1, ref10, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, t, u, w, x, y, z;
+      if (index != null) {
+        for (i = m = 0, ref = maxOur; (0 <= ref ? m <= ref : m >= ref); i = 0 <= ref ? ++m : --m) {
+          // Reset our to [start..end]
+          our[i] = i + start;
+        }
+        b = index % maxB; // permutation
+        a = index / maxB | 0; // combination
+        
+        // Invalidate all edges
+        perm = this[permName];
+        for (i = o = 0, ref1 = maxAll; (0 <= ref1 ? o <= ref1 : o >= ref1); i = 0 <= ref1 ? ++o : --o) {
+          perm[i] = -1;
+        }
+// Generate permutation from index b
+        for (j = p = 1, ref2 = maxOur; (1 <= ref2 ? p <= ref2 : p >= ref2); j = 1 <= ref2 ? ++p : --p) {
+          k = b % (j + 1);
+          b = b / (j + 1) | 0;
+          // TODO: Implement rotateRightBy(our, 0, j, k)
+          while (k > 0) {
+            rotateRight(our, 0, j);
+            k--;
+          }
+        }
+        // Generate combination and set our edges
+        x = maxOur;
+        if (fromEnd) {
+          for (j = q = 0, ref3 = maxAll; (0 <= ref3 ? q <= ref3 : q >= ref3); j = 0 <= ref3 ? ++q : --q) {
+            c = Cnk(maxAll - j, x + 1);
+            if (a - c >= 0) {
+              perm[j] = our[maxOur - x];
+              a -= c;
+              x--;
+            }
+          }
+        } else {
+          for (j = t = ref4 = maxAll; (ref4 <= 0 ? t <= 0 : t >= 0); j = ref4 <= 0 ? ++t : --t) {
+            c = Cnk(j, x + 1);
+            if (a - c >= 0) {
+              perm[j] = our[x];
+              a -= c;
+              x--;
+            }
+          }
+        }
+        return this;
+      } else {
+        perm = this[permName];
+        for (i = u = 0, ref5 = maxOur; (0 <= ref5 ? u <= ref5 : u >= ref5); i = 0 <= ref5 ? ++u : --u) {
+          our[i] = -1;
+        }
+        a = b = x = 0;
+        // Compute the index a < ((maxAll + 1) choose (maxOur + 1)) and
+        // the permutation
+        if (fromEnd) {
+          for (j = w = ref6 = maxAll; (ref6 <= 0 ? w <= 0 : w >= 0); j = ref6 <= 0 ? ++w : --w) {
+            if ((start <= (ref7 = perm[j]) && ref7 <= end)) {
+              a += Cnk(maxAll - j, x + 1);
+              our[maxOur - x] = perm[j];
+              x++;
+            }
+          }
+        } else {
+          for (j = y = 0, ref8 = maxAll; (0 <= ref8 ? y <= ref8 : y >= ref8); j = 0 <= ref8 ? ++y : --y) {
+            if ((start <= (ref9 = perm[j]) && ref9 <= end)) {
+              a += Cnk(j, x + 1);
+              our[x] = perm[j];
+              x++;
+            }
+          }
+        }
+// Compute the index b < (maxOur + 1)! for the permutation
+        for (j = z = ref10 = maxOur; (ref10 <= 0 ? z <= 0 : z >= 0); j = ref10 <= 0 ? ++z : --z) {
+          k = 0;
+          while (our[j] !== start + j) {
+            rotateLeft(our, 0, j);
+            k++;
+          }
+          b = (j + 1) * b + k;
+        }
+        return a * maxB + b;
+      }
+    };
+  };
+
+  Include = {
+    // The twist of the 8 corners, 0 <= twist < 3^7. The orientation of
+    // the DRB corner is fully determined by the orientation of the other
+    // corners.
+    twist: function(twist) {
+      var i, m, o, ori, parity, v;
+      if (twist != null) {
+        parity = 0;
+        for (i = m = 6; m >= 0; i = --m) {
+          ori = twist % 3;
+          twist = (twist / 3) | 0;
+          this.co[i] = ori;
+          parity += ori;
+        }
+        this.co[7] = (3 - parity % 3) % 3;
+        return this;
+      } else {
+        v = 0;
+        for (i = o = 0; o <= 6; i = ++o) {
+          v = 3 * v + this.co[i];
+        }
+        return v;
+      }
+    },
+    // The flip of the 12 edges, 0 <= flip < 2^11. The orientation of the
+    // BR edge is fully determined by the orientation of the other edges.
+    flip: function(flip) {
+      var i, m, o, ori, parity, v;
+      if (flip != null) {
+        parity = 0;
+        for (i = m = 10; m >= 0; i = --m) {
+          ori = flip % 2;
+          flip = flip / 2 | 0;
+          this.eo[i] = ori;
+          parity += ori;
+        }
+        this.eo[11] = (2 - parity % 2) % 2;
+        return this;
+      } else {
+        v = 0;
+        for (i = o = 0; o <= 10; i = ++o) {
+          v = 2 * v + this.eo[i];
+        }
+        return v;
+      }
+    },
+    // Parity of the corner permutation
+    cornerParity: function() {
+      var i, j, m, o, ref, ref1, ref2, ref3, s;
+      s = 0;
+      for (i = m = ref = DRB, ref1 = URF + 1; (ref <= ref1 ? m <= ref1 : m >= ref1); i = ref <= ref1 ? ++m : --m) {
+        for (j = o = ref2 = i - 1, ref3 = URF; (ref2 <= ref3 ? o <= ref3 : o >= ref3); j = ref2 <= ref3 ? ++o : --o) {
+          if (this.cp[j] > this.cp[i]) {
+            s++;
+          }
+        }
+      }
+      return s % 2;
+    },
+    // Parity of the edges permutation. Parity of corners and edges are
+    // the same if the cube is solvable.
+    edgeParity: function() {
+      var i, j, m, o, ref, ref1, ref2, ref3, s;
+      s = 0;
+      for (i = m = ref = BR, ref1 = UR + 1; (ref <= ref1 ? m <= ref1 : m >= ref1); i = ref <= ref1 ? ++m : --m) {
+        for (j = o = ref2 = i - 1, ref3 = UR; (ref2 <= ref3 ? o <= ref3 : o >= ref3); j = ref2 <= ref3 ? ++o : --o) {
+          if (this.ep[j] > this.ep[i]) {
+            s++;
+          }
+        }
+      }
+      return s % 2;
+    },
+    // Permutation of the six corners URF, UFL, ULB, UBR, DFR, DLF
+    URFtoDLF: permutationIndex('corners', URF, DLF),
+    // Permutation of the three edges UR, UF, UL
+    URtoUL: permutationIndex('edges', UR, UL),
+    // Permutation of the three edges UB, DR, DF
+    UBtoDF: permutationIndex('edges', UB, DF),
+    // Permutation of the six edges UR, UF, UL, UB, DR, DF
+    URtoDF: permutationIndex('edges', UR, DF),
+    // Permutation of the equator slice edges FR, FL, BL and BR
+    FRtoBR: permutationIndex('edges', FR, BR, true)
+  };
+
+  for (key in Include) {
+    value = Include[key];
+    Cube.prototype[key] = value;
+  }
+
+  computeMoveTable = function(context, coord, size) {
+    var apply, cube, i, inner, j, k, m, move, o, p, ref, results;
+    // Loop through all valid values for the coordinate, setting cube's
+    // state in each iteration. Then apply each of the 18 moves to the
+    // cube, and compute the resulting coordinate.
+    apply = context === 'corners' ? 'cornerMultiply' : 'edgeMultiply';
+    cube = new Cube;
+    results = [];
+    for (i = m = 0, ref = size - 1; (0 <= ref ? m <= ref : m >= ref); i = 0 <= ref ? ++m : --m) {
+      cube[coord](i);
+      inner = [];
+      for (j = o = 0; o <= 5; j = ++o) {
+        move = Cube.moves[j];
+        for (k = p = 0; p <= 2; k = ++p) {
+          cube[apply](move);
+          inner.push(cube[coord]());
+        }
+        // 4th face turn restores the cube
+        cube[apply](move);
+      }
+      results.push(inner);
+    }
+    return results;
+  };
+
+  // Because we only have the phase 2 URtoDF coordinates, we need to
+  // merge the URtoUL and UBtoDF coordinates to URtoDF in the beginning
+  // of phase 2.
+  mergeURtoDF = (function() {
+    var a, b;
+    a = new Cube;
+    b = new Cube;
+    return function(URtoUL, UBtoDF) {
+      var i, m;
+      // Collisions can be found because unset are set to -1
+      a.URtoUL(URtoUL);
+      b.UBtoDF(UBtoDF);
+      for (i = m = 0; m <= 7; i = ++m) {
+        if (a.ep[i] !== -1) {
+          if (b.ep[i] !== -1) {
+            return -1; // collision
+          } else {
+            b.ep[i] = a.ep[i];
+          }
+        }
+      }
+      return b.URtoDF();
+    };
+  })();
+
+  N_TWIST = 2187; // 3^7 corner orientations
+
+  N_FLIP = 2048; // 2^11 possible edge flips
+
+  N_PARITY = 2; // 2 possible parities
+
+  N_FRtoBR = 11880; // 12!/(12-4)! permutations of FR..BR edges
+
+  N_SLICE1 = 495; // (12 choose 4) possible positions of FR..BR edges
+
+  N_SLICE2 = 24; // 4! permutations of FR..BR edges in phase 2
+
+  N_URFtoDLF = 20160; // 8!/(8-6)! permutations of URF..DLF corners
+
+  
+  // The URtoDF move table is only computed for phase 2 because the full
+  // table would have >650000 entries
+  N_URtoDF = 20160; // 8!/(8-6)! permutation of UR..DF edges in phase 2
+
+  N_URtoUL = 1320; // 12!/(12-3)! permutations of UR..UL edges
+
+  N_UBtoDF = 1320; // 12!/(12-3)! permutations of UB..DF edges
+
+  
+  // The move table for parity is so small that it's included here
+  Cube.moveTables = {
+    parity: [[1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1], [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]],
+    twist: null,
+    flip: null,
+    FRtoBR: null,
+    URFtoDLF: null,
+    URtoDF: null,
+    URtoUL: null,
+    UBtoDF: null,
+    mergeURtoDF: null
+  };
+
+  // Other move tables are computed on the fly
+  moveTableParams = {
+    // name: [scope, size]
+    twist: ['corners', N_TWIST],
+    flip: ['edges', N_FLIP],
+    FRtoBR: ['edges', N_FRtoBR],
+    URFtoDLF: ['corners', N_URFtoDLF],
+    URtoDF: ['edges', N_URtoDF],
+    URtoUL: ['edges', N_URtoUL],
+    UBtoDF: ['edges', N_UBtoDF],
+    mergeURtoDF: []
+  };
+
+  Cube.computeMoveTables = function(...tables) {
+    var len, m, name, scope, size, tableName;
+    if (tables.length === 0) {
+      tables = (function() {
+        var results;
+        results = [];
+        for (name in moveTableParams) {
+          results.push(name);
+        }
+        return results;
+      })();
+    }
+    for (m = 0, len = tables.length; m < len; m++) {
+      tableName = tables[m];
+      if (this.moveTables[tableName] !== null) {
+        // Already computed
+        continue;
+      }
+      if (tableName === 'mergeURtoDF') {
+        this.moveTables.mergeURtoDF = (function() {
+          var UBtoDF, URtoUL, o, results;
+          results = [];
+          for (URtoUL = o = 0; o <= 335; URtoUL = ++o) {
+            results.push((function() {
+              var p, results1;
+              results1 = [];
+              for (UBtoDF = p = 0; p <= 335; UBtoDF = ++p) {
+                results1.push(mergeURtoDF(URtoUL, UBtoDF));
+              }
+              return results1;
+            })());
+          }
+          return results;
+        })();
+      } else {
+        [scope, size] = moveTableParams[tableName];
+        this.moveTables[tableName] = computeMoveTable(scope, tableName, size);
+      }
+    }
+    return this;
+  };
+
+  // Phase 1: All moves are valid
+  allMoves1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+
+  // The list of next valid phase 1 moves when the given face was turned
+  // in the last move
+  nextMoves1 = (function() {
+    var face, lastFace, m, next, o, p, power, results;
+    results = [];
+    for (lastFace = m = 0; m <= 5; lastFace = ++m) {
+      next = [];
+// Don't allow commuting moves, e.g. U U'. Also make sure that
+// opposite faces are always moved in the same order, i.e. allow
+// U D but no D U. This avoids sequences like U D U'.
+      for (face = o = 0; o <= 5; face = ++o) {
+        if (face !== lastFace && face !== lastFace - 3) {
+// single, double or inverse move
+          for (power = p = 0; p <= 2; power = ++p) {
+            next.push(face * 3 + power);
+          }
+        }
+      }
+      results.push(next);
+    }
+    return results;
+  })();
+
+  // Phase 2: Double moves of all faces plus quarter moves of U and D
+  allMoves2 = [0, 1, 2, 4, 7, 9, 10, 11, 13, 16];
+
+  nextMoves2 = (function() {
+    var face, lastFace, len, m, next, o, p, power, powers, results;
+    results = [];
+    for (lastFace = m = 0; m <= 5; lastFace = ++m) {
+      next = [];
+      for (face = o = 0; o <= 5; face = ++o) {
+        if (!(face !== lastFace && face !== lastFace - 3)) {
+          continue;
+        }
+        // Allow all moves of U and D and double moves of others
+        powers = face === 0 || face === 3 ? [0, 1, 2] : [1];
+        for (p = 0, len = powers.length; p < len; p++) {
+          power = powers[p];
+          next.push(face * 3 + power);
+        }
+      }
+      results.push(next);
+    }
+    return results;
+  })();
+
+  // 8 values are encoded in one number
+  pruning = function(table, index, value) {
+    var pos, shift, slot;
+    pos = index % 8;
+    slot = index >> 3;
+    shift = pos << 2;
+    if (value != null) {
+      // Set
+      table[slot] &= ~(0xF << shift);
+      table[slot] |= value << shift;
+      return value;
+    } else {
+      // Get
+      return (table[slot] & (0xF << shift)) >>> shift;
+    }
+  };
+
+  computePruningTable = function(phase, size, currentCoords, nextIndex) {
+    var current, depth, done, index, len, m, move, moves, next, o, ref, table, x;
+    // Initialize all values to 0xF
+    table = (function() {
+      var m, ref, results;
+      results = [];
+      for (x = m = 0, ref = Math.ceil(size / 8) - 1; (0 <= ref ? m <= ref : m >= ref); x = 0 <= ref ? ++m : --m) {
+        results.push(0xFFFFFFFF);
+      }
+      return results;
+    })();
+    if (phase === 1) {
+      moves = allMoves1;
+    } else {
+      moves = allMoves2;
+    }
+    depth = 0;
+    pruning(table, 0, depth);
+    done = 1;
+    // In each iteration, take each state found in the previous depth and
+    // compute the next state. Stop when all states have been assigned a
+    // depth.
+    while (done !== size) {
+      for (index = m = 0, ref = size - 1; (0 <= ref ? m <= ref : m >= ref); index = 0 <= ref ? ++m : --m) {
+        if (!(pruning(table, index) === depth)) {
+          continue;
+        }
+        current = currentCoords(index);
+        for (o = 0, len = moves.length; o < len; o++) {
+          move = moves[o];
+          next = nextIndex(current, move);
+          if (pruning(table, next) === 0xF) {
+            pruning(table, next, depth + 1);
+            done++;
+          }
+        }
+      }
+      depth++;
+    }
+    return table;
+  };
+
+  Cube.pruningTables = {
+    sliceTwist: null,
+    sliceFlip: null,
+    sliceURFtoDLFParity: null,
+    sliceURtoDFParity: null
+  };
+
+  pruningTableParams = {
+    // name: [phase, size, currentCoords, nextIndex]
+    sliceTwist: [
+      1,
+      N_SLICE1 * N_TWIST,
+      function(index) {
+        return [index % N_SLICE1,
+      index / N_SLICE1 | 0];
+      },
+      function(current,
+      move) {
+        var newSlice,
+      newTwist,
+      slice,
+      twist;
+        [slice,
+      twist] = current;
+        newSlice = Cube.moveTables.FRtoBR[slice * 24][move] / 24 | 0;
+        newTwist = Cube.moveTables.twist[twist][move];
+        return newTwist * N_SLICE1 + newSlice;
+      }
+    ],
+    sliceFlip: [
+      1,
+      N_SLICE1 * N_FLIP,
+      function(index) {
+        return [index % N_SLICE1,
+      index / N_SLICE1 | 0];
+      },
+      function(current,
+      move) {
+        var flip,
+      newFlip,
+      newSlice,
+      slice;
+        [slice,
+      flip] = current;
+        newSlice = Cube.moveTables.FRtoBR[slice * 24][move] / 24 | 0;
+        newFlip = Cube.moveTables.flip[flip][move];
+        return newFlip * N_SLICE1 + newSlice;
+      }
+    ],
+    sliceURFtoDLFParity: [
+      2,
+      N_SLICE2 * N_URFtoDLF * N_PARITY,
+      function(index) {
+        return [index % 2,
+      (index / 2 | 0) % N_SLICE2,
+      (index / 2 | 0) / N_SLICE2 | 0];
+      },
+      function(current,
+      move) {
+        var URFtoDLF,
+      newParity,
+      newSlice,
+      newURFtoDLF,
+      parity,
+      slice;
+        [parity,
+      slice,
+      URFtoDLF] = current;
+        newParity = Cube.moveTables.parity[parity][move];
+        newSlice = Cube.moveTables.FRtoBR[slice][move];
+        newURFtoDLF = Cube.moveTables.URFtoDLF[URFtoDLF][move];
+        return (newURFtoDLF * N_SLICE2 + newSlice) * 2 + newParity;
+      }
+    ],
+    sliceURtoDFParity: [
+      2,
+      N_SLICE2 * N_URtoDF * N_PARITY,
+      function(index) {
+        return [index % 2,
+      (index / 2 | 0) % N_SLICE2,
+      (index / 2 | 0) / N_SLICE2 | 0];
+      },
+      function(current,
+      move) {
+        var URtoDF,
+      newParity,
+      newSlice,
+      newURtoDF,
+      parity,
+      slice;
+        [parity,
+      slice,
+      URtoDF] = current;
+        newParity = Cube.moveTables.parity[parity][move];
+        newSlice = Cube.moveTables.FRtoBR[slice][move];
+        newURtoDF = Cube.moveTables.URtoDF[URtoDF][move];
+        return (newURtoDF * N_SLICE2 + newSlice) * 2 + newParity;
+      }
+    ]
+  };
+
+  Cube.computePruningTables = function(...tables) {
+    var len, m, name, params, tableName;
+    if (tables.length === 0) {
+      tables = (function() {
+        var results;
+        results = [];
+        for (name in pruningTableParams) {
+          results.push(name);
+        }
+        return results;
+      })();
+    }
+    for (m = 0, len = tables.length; m < len; m++) {
+      tableName = tables[m];
+      if (this.pruningTables[tableName] !== null) {
+        // Already computed
+        continue;
+      }
+      params = pruningTableParams[tableName];
+      this.pruningTables[tableName] = computePruningTable(...params);
+    }
+    return this;
+  };
+
+  Cube.initSolver = function() {
+    Cube.computeMoveTables();
+    return Cube.computePruningTables();
+  };
+
+  Cube.prototype.solveUpright = function(maxDepth = 22) {
+    var State, freeStates, moveNames, phase1, phase1search, phase2, phase2search, solution, state, x;
+    // Names for all moves, i.e. U, U2, U', F, F2, ...
+    moveNames = (function() {
+      var face, faceName, m, o, power, powerName, result;
+      faceName = ['U', 'R', 'F', 'D', 'L', 'B'];
+      powerName = ['', '2', "'"];
+      result = [];
+      for (face = m = 0; m <= 5; face = ++m) {
+        for (power = o = 0; o <= 2; power = ++o) {
+          result.push(faceName[face] + powerName[power]);
+        }
+      }
+      return result;
+    })();
+    State = class State {
+      constructor(cube) {
+        this.parent = null;
+        this.lastMove = null;
+        this.depth = 0;
+        if (cube) {
+          this.init(cube);
+        }
+      }
+
+      init(cube) {
+        // Phase 1 coordinates
+        this.flip = cube.flip();
+        this.twist = cube.twist();
+        this.slice = cube.FRtoBR() / N_SLICE2 | 0;
+        // Phase 2 coordinates
+        this.parity = cube.cornerParity();
+        this.URFtoDLF = cube.URFtoDLF();
+        this.FRtoBR = cube.FRtoBR();
+        // These are later merged to URtoDF when phase 2 begins
+        this.URtoUL = cube.URtoUL();
+        this.UBtoDF = cube.UBtoDF();
+        return this;
+      }
+
+      solution() {
+        if (this.parent) {
+          return this.parent.solution() + moveNames[this.lastMove] + ' ';
+        } else {
+          return '';
+        }
+      }
+
+      //# Helpers
+      move(table, index, move) {
+        return Cube.moveTables[table][index][move];
+      }
+
+      pruning(table, index) {
+        return pruning(Cube.pruningTables[table], index);
+      }
+
+      //# Phase 1
+
+      // Return the next valid phase 1 moves for this state
+      moves1() {
+        if (this.lastMove !== null) {
+          return nextMoves1[this.lastMove / 3 | 0];
+        } else {
+          return allMoves1;
+        }
+      }
+
+      // Compute the minimum number of moves to the end of phase 1
+      minDist1() {
+        var d1, d2;
+        // The maximum number of moves to the end of phase 1 wrt. the
+        // combination flip and slice coordinates only
+        d1 = this.pruning('sliceFlip', N_SLICE1 * this.flip + this.slice);
+        // The combination of twist and slice coordinates
+        d2 = this.pruning('sliceTwist', N_SLICE1 * this.twist + this.slice);
+        // The true minimal distance is the maximum of these two
+        return max(d1, d2);
+      }
+
+      // Compute the next phase 1 state for the given move
+      next1(move) {
+        var next;
+        next = freeStates.pop();
+        next.parent = this;
+        next.lastMove = move;
+        next.depth = this.depth + 1;
+        next.flip = this.move('flip', this.flip, move);
+        next.twist = this.move('twist', this.twist, move);
+        next.slice = this.move('FRtoBR', this.slice * 24, move) / 24 | 0;
+        return next;
+      }
+
+      //# Phase 2
+
+      // Return the next valid phase 2 moves for this state
+      moves2() {
+        if (this.lastMove !== null) {
+          return nextMoves2[this.lastMove / 3 | 0];
+        } else {
+          return allMoves2;
+        }
+      }
+
+      // Compute the minimum number of moves to the solved cube
+      minDist2() {
+        var d1, d2, index1, index2;
+        index1 = (N_SLICE2 * this.URtoDF + this.FRtoBR) * N_PARITY + this.parity;
+        d1 = this.pruning('sliceURtoDFParity', index1);
+        index2 = (N_SLICE2 * this.URFtoDLF + this.FRtoBR) * N_PARITY + this.parity;
+        d2 = this.pruning('sliceURFtoDLFParity', index2);
+        return max(d1, d2);
+      }
+
+      // Initialize phase 2 coordinates
+      init2(top = true) {
+        if (this.parent === null) {
+          return;
+        }
+        // For other states, the phase 2 state is computed based on
+        // parent's state.
+        // Already assigned for the initial state
+        this.parent.init2(false);
+        this.URFtoDLF = this.move('URFtoDLF', this.parent.URFtoDLF, this.lastMove);
+        this.FRtoBR = this.move('FRtoBR', this.parent.FRtoBR, this.lastMove);
+        this.parity = this.move('parity', this.parent.parity, this.lastMove);
+        this.URtoUL = this.move('URtoUL', this.parent.URtoUL, this.lastMove);
+        this.UBtoDF = this.move('UBtoDF', this.parent.UBtoDF, this.lastMove);
+        if (top) {
+          // This is the initial phase 2 state. Get the URtoDF coordinate
+          // by merging URtoUL and UBtoDF
+          return this.URtoDF = this.move('mergeURtoDF', this.URtoUL, this.UBtoDF);
+        }
+      }
+
+      // Compute the next phase 2 state for the given move
+      next2(move) {
+        var next;
+        next = freeStates.pop();
+        next.parent = this;
+        next.lastMove = move;
+        next.depth = this.depth + 1;
+        next.URFtoDLF = this.move('URFtoDLF', this.URFtoDLF, move);
+        next.FRtoBR = this.move('FRtoBR', this.FRtoBR, move);
+        next.parity = this.move('parity', this.parity, move);
+        next.URtoDF = this.move('URtoDF', this.URtoDF, move);
+        return next;
+      }
+
+    };
+    solution = null;
+    phase1search = function(state) {
+      var depth, m, ref, results;
+      depth = 0;
+      results = [];
+      for (depth = m = 1, ref = maxDepth; (1 <= ref ? m <= ref : m >= ref); depth = 1 <= ref ? ++m : --m) {
+        phase1(state, depth);
+        if (solution !== null) {
+          break;
+        }
+        results.push(depth++);
+      }
+      return results;
+    };
+    phase1 = function(state, depth) {
+      var len, m, move, next, ref, ref1, results;
+      if (depth === 0) {
+        if (state.minDist1() === 0) {
+          // Make sure we don't start phase 2 with a phase 2 move as the
+          // last move in phase 1, because phase 2 would then repeat the
+          // same move.
+          if (state.lastMove === null || (ref = state.lastMove, indexOf.call(allMoves2, ref) < 0)) {
+            return phase2search(state);
+          }
+        }
+      } else if (depth > 0) {
+        if (state.minDist1() <= depth) {
+          ref1 = state.moves1();
+          results = [];
+          for (m = 0, len = ref1.length; m < len; m++) {
+            move = ref1[m];
+            next = state.next1(move);
+            phase1(next, depth - 1);
+            freeStates.push(next);
+            if (solution !== null) {
+              break;
+            } else {
+              results.push(void 0);
+            }
+          }
+          return results;
+        }
+      }
+    };
+    phase2search = function(state) {
+      var depth, m, ref, results;
+      // Initialize phase 2 coordinates
+      state.init2();
+      results = [];
+      for (depth = m = 1, ref = maxDepth - state.depth; (1 <= ref ? m <= ref : m >= ref); depth = 1 <= ref ? ++m : --m) {
+        phase2(state, depth);
+        if (solution !== null) {
+          break;
+        }
+        results.push(depth++);
+      }
+      return results;
+    };
+    phase2 = function(state, depth) {
+      var len, m, move, next, ref, results;
+      if (depth === 0) {
+        if (state.minDist2() === 0) {
+          return solution = state.solution();
+        }
+      } else if (depth > 0) {
+        if (state.minDist2() <= depth) {
+          ref = state.moves2();
+          results = [];
+          for (m = 0, len = ref.length; m < len; m++) {
+            move = ref[m];
+            next = state.next2(move);
+            phase2(next, depth - 1);
+            freeStates.push(next);
+            if (solution !== null) {
+              break;
+            } else {
+              results.push(void 0);
+            }
+          }
+          return results;
+        }
+      }
+    };
+    freeStates = (function() {
+      var m, ref, results;
+      results = [];
+      for (x = m = 0, ref = maxDepth + 1; (0 <= ref ? m <= ref : m >= ref); x = 0 <= ref ? ++m : --m) {
+        results.push(new State);
+      }
+      return results;
+    })();
+    state = freeStates.pop().init(this);
+    phase1search(state);
+    freeStates.push(state);
+    // Trim the trailing space
+    if (solution.length > 0) {
+      solution = solution.substring(0, solution.length - 1);
+    }
+    return solution;
+  };
+
+  faceNums = {
+    U: 0,
+    R: 1,
+    F: 2,
+    D: 3,
+    L: 4,
+    B: 5
+  };
+
+  faceNames = {
+    0: 'U',
+    1: 'R',
+    2: 'F',
+    3: 'D',
+    4: 'L',
+    5: 'B'
+  };
+
+  Cube.prototype.solve = function(maxDepth = 22) {
+    var clone, len, m, move, ref, rotation, solution, upright, uprightSolution;
+    clone = this.clone();
+    upright = clone.upright();
+    clone.move(upright);
+    rotation = new Cube().move(upright).center;
+    uprightSolution = clone.solveUpright(maxDepth);
+    solution = [];
+    ref = uprightSolution.split(' ');
+    for (m = 0, len = ref.length; m < len; m++) {
+      move = ref[m];
+      solution.push(faceNames[rotation[faceNums[move[0]]]]);
+      if (move.length > 1) {
+        solution[solution.length - 1] += move[1];
+      }
+    }
+    return solution.join(' ');
+  };
+
+  Cube.scramble = function() {
+    return Cube.inverse(Cube.random().solve());
+  };
+
+}).call(this);
+
+</script>
+
 <script>
+// ===== CONSTANTS =====
 const SCAN=[
   {f:'F',cc:'R',name:'前面（紅）',guide:'白色朝上，紅色對鏡頭'},
   {f:'R',cc:'B',name:'右面（藍）',rot:'順時針轉 90°',arrow:'↻'},
@@ -104,17 +2202,28 @@ const SCAN=[
 const CMAP={W:'#FFFFFF',R:'#B71234',B:'#0046AD',O:'#FF5800',G:'#009B48',Y:'#FFD500'};
 const CC={F:'R',R:'B',B:'O',L:'G',U:'W',D:'Y'};
 const C2F={W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
+const MOVE_DESC={
+  'U':'上層 ↻ 順時針','U\'':'上層 ↺ 逆時針','U2':'上層轉 180°',
+  'D':'下層 ↻ 順時針','D\'':'下層 ↺ 逆時針','D2':'下層轉 180°',
+  'R':'右層 ↻ 往下推','R\'':'右層 ↺ 往上推','R2':'右層轉 180°',
+  'L':'左層 ↻ 往下推','L\'':'左層 ↺ 往上推','L2':'左層轉 180°',
+  'F':'前層 ↻ 順時針','F\'':'前層 ↺ 逆時針','F2':'前層轉 180°',
+  'B':'後層 ↻ 順時針(從後看)','B\'':'後層 ↺ 逆時針(從後看)','B2':'後層轉 180°',
+};
 
+// ===== STATE =====
 let vid,ov,octx,sm,sctx;
-let scanning=false, idx=0, prevF=null, still=0;
-let intv=null, faces={}, refs={}, rawData={};
-const STILL_TH=0.05, STILL_N=8; // 8 frames × 200ms = 1.6 sec
+let scanning=false, scanIdx=0, prevFrame=null, stillCnt=0;
+let scanIntv=null, rawData={}, faceColors={};
+const STILL_TH=0.05, STILL_N=8;
 
-function mkDots(){
-  document.getElementById('dots').innerHTML=SCAN.map((_,i)=>
-    `<div class="dot${i<idx?' done':''}${i===idx?' active':''}" id="d${i}"></div>`).join('');
-}
+// Solve state
+let solution=[], solveStep=-1;
+let cubeState={}; // internal cube state for verification
+let mode='start'; // start, scan, solve, complete
+let solverWorker=null;
 
+// ===== CAMERA INIT =====
 async function go(){
   document.getElementById('startScr').style.display='none';
   vid=document.getElementById('vid');
@@ -127,102 +2236,99 @@ async function go(){
     vid.srcObject=s; await vid.play();
     ov.width=vid.videoWidth||720; ov.height=vid.videoHeight||1280;
     sm.width=64; sm.height=64;
-    idx=0; mkDots(); startScan();
+    mode='scan'; scanIdx=0; mkDots(); startScan();
+    initSolver(); // start loading solver in background
   }catch(e){alert('相機錯誤: '+e.message);}
 }
 
+// ===== SOLVER (Web Worker) =====
+function initSolver(){
+  const libSrc=document.getElementById('cubejs-src').textContent;
+  const code=`${libSrc}\nconst C=self.Cube||(typeof Cube!=='undefined'?Cube:null);\nlet rdy=false;\nself.onmessage=function(e){\nif(e.data.type==='init'){try{C.initSolver();rdy=true;postMessage({type:'ready'})}catch(err){postMessage({type:'error',msg:err.message})}}\nif(e.data.type==='solve'){if(!rdy){C.initSolver();rdy=true;}try{const c=C.fromString(e.data.fl);const s=c.solve();postMessage({type:'solution',sol:s})}catch(err){postMessage({type:'error',msg:err.message})}}\n};`;
+  const blob=new Blob([code],{type:'application/javascript'});
+  solverWorker=new Worker(URL.createObjectURL(blob));
+  solverWorker.onmessage=handleSolverMsg;
+  solverWorker.postMessage({type:'init'});
+}
+let solverCallback=null;
+function handleSolverMsg(e){
+  if(e.data.type==='ready') console.log('Solver ready');
+  if(e.data.type==='solution'&&solverCallback) solverCallback(null,e.data.sol);
+  if(e.data.type==='error'&&solverCallback) solverCallback(new Error(e.data.msg),null);
+}
+
+// ===== SCAN PHASE =====
+function mkDots(){
+  document.getElementById('dots').innerHTML=SCAN.map((_,i)=>
+    `<div class="dot${i<scanIdx?' done':''}${i===scanIdx?' active':''}" id="d${i}"></div>`).join('');
+}
 function startScan(){
-  const info=SCAN[idx];
+  const info=SCAN[scanIdx];
   document.getElementById('fl').textContent=info.name;
   document.getElementById('inst').textContent=info.guide||'對準框框，保持不動';
   document.getElementById('bot').style.display='block';
   document.getElementById('dg').style.display='none';
   document.getElementById('sts').textContent='對準框框，保持不動';
-  document.getElementById('dbg').textContent='';
+  document.getElementById('scanHud').style.display='block';
   mkDots();
-  scanning=true; prevF=null; still=0;
-  if(intv)clearInterval(intv);
-  intv=setInterval(tick,200);
+  scanning=true; prevFrame=null; stillCnt=0;
+  if(scanIntv)clearInterval(scanIntv);
+  scanIntv=setInterval(scanTick,200);
 }
-
-function tick(){
+function scanTick(){
   if(!scanning||!vid.videoWidth)return;
   sctx.drawImage(vid,0,0,64,64);
   const fr=sctx.getImageData(0,0,64,64);
-  if(prevF){
+  if(prevFrame){
     let diff=0;const tot=fr.data.length/4;
     for(let i=0;i<fr.data.length;i+=4){
-      const d=(Math.abs(fr.data[i]-prevF.data[i])+Math.abs(fr.data[i+1]-prevF.data[i+1])+Math.abs(fr.data[i+2]-prevF.data[i+2]))/3;
+      const d=(Math.abs(fr.data[i]-prevFrame.data[i])+Math.abs(fr.data[i+1]-prevFrame.data[i+1])+Math.abs(fr.data[i+2]-prevFrame.data[i+2]))/3;
       if(d>18)diff++;
     }
-    const dr=diff/tot;
-    if(dr<STILL_TH){
-      still++;
-      document.getElementById('sts').textContent=`靜止中 ${'●'.repeat(still)}${'○'.repeat(Math.max(0,STILL_N-still))}`;
-      if(still>=STILL_N){capture();return;}
+    if(diff/tot<STILL_TH){
+      stillCnt++;
+      document.getElementById('sts').textContent=`靜止中 ${'●'.repeat(stillCnt)}${'○'.repeat(Math.max(0,STILL_N-stillCnt))}`;
+      if(stillCnt>=STILL_N){scanCapture();return;}
     }else{
-      still=0;
+      stillCnt=0;
       document.getElementById('sts').textContent='對準框框，保持不動';
     }
   }
-  prevF=fr;
-  drawOv();
+  prevFrame=fr;
+  drawScanOv();
 }
-
-function drawOv(){
+function drawScanOv(){
   const vw=ov.width,vh=ov.height;
   octx.clearRect(0,0,vw,vh);
-  const gs=Math.min(vw,vh)*0.55,cs=gs/3;
-  const sx=(vw-gs)/2,sy=(vh-gs)/2;
-
-  // Dim outside
-  octx.fillStyle='rgba(0,0,0,0.3)';
-  octx.fillRect(0,0,vw,sy);
-  octx.fillRect(0,sy+gs,vw,vh-sy-gs);
-  octx.fillRect(0,sy,sx,gs);
-  octx.fillRect(sx+gs,sy,vw-sx-gs,gs);
-
-  // Grid
-  octx.strokeStyle='rgba(255,215,0,0.5)';
-  octx.lineWidth=1.5;
+  const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
+  octx.fillStyle='rgba(0,0,0,0.25)';
+  octx.fillRect(0,0,vw,sy);octx.fillRect(0,sy+gs,vw,vh-sy-gs);
+  octx.fillRect(0,sy,sx,gs);octx.fillRect(sx+gs,sy,vw-sx-gs,gs);
+  octx.strokeStyle='rgba(255,215,0,0.5)';octx.lineWidth=1.5;
   for(let i=0;i<=3;i++){
     octx.beginPath();octx.moveTo(sx+i*cs,sy);octx.lineTo(sx+i*cs,sy+gs);octx.stroke();
     octx.beginPath();octx.moveTo(sx,sy+i*cs);octx.lineTo(sx+gs,sy+i*cs);octx.stroke();
   }
-
-  // Corners
   octx.strokeStyle='#FFD700';octx.lineWidth=3;
-  const mk=16;
+  const mk=14;
   [[sx,sy],[sx+gs,sy],[sx,sy+gs],[sx+gs,sy+gs]].forEach(([x,y])=>{
     const dx=x===sx?1:-1,dy=y===sy?1:-1;
     octx.beginPath();octx.moveTo(x+mk*dx,y);octx.lineTo(x,y);octx.lineTo(x,y+mk*dy);octx.stroke();
   });
-
-  // Progress ring
-  if(still>0){
-    const ccx=sx+gs/2,ccy=sy+gs/2,prog=still/STILL_N;
+  if(stillCnt>0){
+    const ccx=sx+gs/2,ccy=sy+gs/2;
     octx.strokeStyle='#00D2FF';octx.lineWidth=3;
-    octx.beginPath();
-    octx.arc(ccx,ccy,gs/2+15,-Math.PI/2,-Math.PI/2+prog*Math.PI*2);
-    octx.stroke();
+    octx.beginPath();octx.arc(ccx,ccy,gs/2+12,-Math.PI/2,-Math.PI/2+(stillCnt/STILL_N)*Math.PI*2);octx.stroke();
   }
 }
-
-function capture(){
-  scanning=false;
-  if(intv)clearInterval(intv);
+function scanCapture(){
+  scanning=false;if(scanIntv)clearInterval(scanIntv);
   if(navigator.vibrate)navigator.vibrate(100);
-
   const vw=vid.videoWidth,vh=vid.videoHeight;
-  const tc=document.createElement('canvas');
-  tc.width=vw;tc.height=vh;
-  const tctx=tc.getContext('2d');
-  tctx.drawImage(vid,0,0,vw,vh);
-
-  const gs=Math.min(vw,vh)*0.55,cs=gs/3;
-  const sx=(vw-gs)/2,sy=(vh-gs)/2;
-  const info=SCAN[idx];
-
+  const tc=document.createElement('canvas');tc.width=vw;tc.height=vh;
+  const tctx=tc.getContext('2d');tctx.drawImage(vid,0,0,vw,vh);
+  const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
+  const info=SCAN[scanIdx];
   let rgbs=[];
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){
     const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
@@ -232,168 +2338,501 @@ function capture(){
     const n=d.data.length/4;
     rgbs.push([Math.round(rr/n),Math.round(gg/n),Math.round(bb/n)]);
   }
-
   rawData[info.f]=rgbs;
-
-  // Show raw RGB preview
-  const dg=document.getElementById('dg');
-  dg.style.display='grid';
-  dg.innerHTML=rgbs.map(([r,g,b],i)=>
-    `<div class="det-cell" style="background:rgb(${r},${g},${b})">${i===4?'⭐':''}</div>`
-  ).join('');
-  document.getElementById('sts').textContent=`✅ ${info.name} 已拍攝 (${idx+1}/6)`;
-
-  setTimeout(()=>{
-    try{
-      idx++;
-      if(idx>=SCAN.length){ globalClassify(); }
-      else{ showRotate(); }
-    }catch(e){
-      document.getElementById('sts').textContent='錯誤: '+e.message;
-      console.error(e);
-    }
-  }, 800);
+  const dg=document.getElementById('dg');dg.style.display='grid';
+  dg.innerHTML=rgbs.map(([r,g,b],i)=>`<div class="mini-cell" style="background:rgb(${r},${g},${b})">${i===4?'⭐':''}</div>`).join('');
+  document.getElementById('sts').textContent=`✅ ${info.name} 已拍攝 (${scanIdx+1}/6)`;
+  setTimeout(()=>{try{
+    scanIdx++;
+    if(scanIdx>=SCAN.length)globalClassify();
+    else showRotate();
+  }catch(e){document.getElementById('sts').textContent='錯誤:'+e.message;console.error(e);}},800);
+}
+function showRotate(){
+  const info=SCAN[scanIdx];
+  document.getElementById('rotOv').classList.add('show');
+  document.getElementById('rotIcon').textContent=info.arrow||'↻';
+  document.getElementById('rotTxt').textContent=info.rot;
+  document.getElementById('rotSub').textContent=`下一面：${info.name}`;
+  let cd=3;document.getElementById('rotCD').textContent=cd;
+  const ci=setInterval(()=>{cd--;if(cd<=0){clearInterval(ci);document.getElementById('rotOv').classList.remove('show');startScan();}else document.getElementById('rotCD').textContent=cd;},1000);
 }
 
 // ===== GLOBAL CLASSIFICATION =====
 function globalClassify(){
   document.getElementById('sts').textContent='分析 54 色塊中...';
   const FO=['U','R','F','D','L','B'];
-
-  // Collect all 54 stickers
   const all=[];
-  FO.forEach(f=>{
-    const rgbs=rawData[f];
-    if(!rgbs)return;
-    for(let i=0;i<9;i++) all.push({face:f,pos:i,rgb:rgbs[i],color:null});
-  });
-
-  if(all.length!==54){showResult(false);return;}
-
-  // 6 anchors from center stickers (pos=4)
-  const anchors={};
-  FO.forEach(f=>{ anchors[CC[f]]=rawData[f][4]; });
-
-  // Fix centers
-  all.forEach(s=>{ if(s.pos===4) s.color=CC[s.face]; });
-
-  // Compute distance from each non-center to each anchor
+  FO.forEach(f=>{const rgbs=rawData[f];if(!rgbs)return;for(let i=0;i<9;i++)all.push({face:f,pos:i,rgb:rgbs[i],color:null});});
+  if(all.length!==54){showScanResult(false,'只有'+all.length+'個色塊');return;}
+  const anchors={};FO.forEach(f=>{anchors[CC[f]]=rawData[f][4];});
+  all.forEach(s=>{if(s.pos===4)s.color=CC[s.face];});
   const nonC=all.filter(s=>s.pos!==4);
-  nonC.forEach(s=>{
-    s.dists={};
-    Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{
-      const [r,g,b]=s.rgb;
-      s.dists[c]=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);
-    });
-  });
-
-  // Greedy assignment: most confident first, each color max 9
+  nonC.forEach(s=>{s.dists={};Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{const[r,g,b]=s.rgb;s.dists[c]=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);});});
   const cnt={W:1,R:1,B:1,O:1,G:1,Y:1};
-
-  // Build flat list of (sticker, color, distance) sorted by distance
-  const candidates=[];
-  nonC.forEach(s=>{
-    Object.entries(s.dists).forEach(([c,d])=>{
-      candidates.push({s,c,d});
-    });
-  });
-  candidates.sort((a,b)=>a.d-b.d);
-
-  // Assign greedily
-  candidates.forEach(({s,c,d})=>{
-    if(s.color) return; // already assigned
-    if(cnt[c]>=9) return; // color full
-    s.color=c;
-    cnt[c]++;
-  });
-
-  // Safety: assign any remaining
-  nonC.filter(s=>!s.color).forEach(s=>{
-    const avail=Object.entries(cnt).find(([c,n])=>n<9);
-    if(avail){s.color=avail[0];cnt[avail[0]]++;}
-  });
-
-  // Build faces
-  FO.forEach(f=>{
-    faces[f]=all.filter(s=>s.face===f).sort((a,b)=>a.pos-b.pos).map(s=>s.color);
-  });
-
-  const anchorStr=Object.entries(anchors).map(([c,[r,g,b]])=>`${c}=(${r},${g},${b})`).join(' ');
-  showResult(true, anchorStr);
-}
-
-// Rotation guide with auto-countdown
-function showRotate(){
-  const info=SCAN[idx];
-  const ov=document.getElementById('rotOv');
-  ov.classList.add('show');
-  document.getElementById('rotIcon').textContent=info.arrow||'↻';
-  document.getElementById('rotTxt').textContent=info.rot;
-  document.getElementById('rotSub').textContent=`下一面：${info.name}`;
-  let cd=3;
-  document.getElementById('rotCD').textContent=cd;
-  const ci=setInterval(()=>{
-    cd--;
-    if(cd<=0){
-      clearInterval(ci);
-      ov.classList.remove('show');
-      startScan();
-    }else{
-      document.getElementById('rotCD').textContent=cd;
-    }
-  },1000);
-}
-
-// Result screen
-function showResult(dataOk, extra){
-  document.getElementById('bot').style.display='none';
-  const rs=document.getElementById('resultScr');
-  rs.classList.add('show');
-
-  const FO=['U','R','F','D','L','B'];
-
+  const cands=[];nonC.forEach(s=>{Object.entries(s.dists).forEach(([c,d])=>{cands.push({s,c,d});});});
+  cands.sort((a,b)=>a.d-b.d);
+  cands.forEach(({s,c})=>{if(s.color||cnt[c]>=9)return;s.color=c;cnt[c]++;});
+  nonC.filter(s=>!s.color).forEach(s=>{const a=Object.entries(cnt).find(([c,n])=>n<9);if(a){s.color=a[0];cnt[a[0]]++;}});
+  FO.forEach(f=>{faceColors[f]=all.filter(s=>s.face===f).sort((a,b)=>a.pos-b.pos).map(s=>s.color);});
   // Build facelet
-  let fl='';
-  FO.forEach(f=>{
-    const c=faces[f];
-    if(!c){fl+='?????????';return;}
-    c.forEach(x=>fl+=C2F[x]||'?');
-  });
+  let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
+  const fcnt={};for(const ch of fl)fcnt[ch]=(fcnt[ch]||0)+1;
+  const ok=!fl.includes('?')&&Object.values(fcnt).every(v=>v===9);
+  if(!ok){showScanResult(false,JSON.stringify(fcnt));return;}
+  // Solve!
+  startSolving(fl);
+}
 
-  const cnt={};
-  for(const ch of fl)cnt[ch]=(cnt[ch]||0)+1;
-  const ok=!fl.includes('?')&&Object.values(cnt).every(v=>v===9);
-
-  // Face previews
-  const fp=document.getElementById('resFaces');
-  fp.innerHTML='';
-  FO.forEach(f=>{
-    const c=faces[f];
-    if(!c)return;
+function showScanResult(ok,detail){
+  document.getElementById('bot').style.display='none';
+  document.getElementById('scanHud').style.display='none';
+  const rs=document.getElementById('resultScr');rs.classList.add('show');
+  document.getElementById('resTitle').textContent='⚠️ 掃描問題';
+  document.getElementById('resMsg').innerHTML=`<span style="color:#E94560">${detail||'未知錯誤'}</span>`;
+  document.getElementById('resBtn').textContent='重新開始';
+  document.getElementById('resBtn').onclick=()=>location.reload();
+  // Show face previews
+  const fp=document.getElementById('resFaces');fp.innerHTML='';
+  ['U','R','F','D','L','B'].forEach(f=>{
+    const c=faceColors[f];if(!c)return;
     const d=document.createElement('div');
-    d.innerHTML=`<div class="face-title">${f}(${CC[f]==='W'?'白':CC[f]==='R'?'紅':CC[f]==='B'?'藍':CC[f]==='O'?'橘':CC[f]==='G'?'綠':'黃'})</div><div class="mini-face">${c.map(x=>`<div class="mc" style="background:${CMAP[x]}"></div>`).join('')}</div>`;
+    d.innerHTML=`<div class="mf-title">${f}</div><div class="mf">${c.map(x=>`<div class="mc" style="background:${CMAP[x]||'#333'}"></div>`).join('')}</div>`;
     fp.appendChild(d);
   });
+}
 
-  if(ok){
-    document.getElementById('resTitle').textContent='✅ 掃描成功！';
-    document.getElementById('resMsg').innerHTML=`<span style="color:#00D2FF">每色 9 格 ✓</span>`;
-    document.getElementById('resData').textContent=fl+(extra?'\n'+extra:'');
-    document.getElementById('resBtn').textContent='複製 Facelet';
-    document.getElementById('resBtn').onclick=()=>{
-      navigator.clipboard.writeText(fl).catch(()=>{});
-      alert('已複製！\n'+fl);
-    };
-  }else{
-    document.getElementById('resTitle').textContent='⚠️ 數量異常';
-    document.getElementById('resMsg').innerHTML=`<span style="color:#E94560">${JSON.stringify(cnt)}</span>`;
-    document.getElementById('resData').textContent=fl+(extra?'\n'+extra:'');
-    document.getElementById('resBtn').textContent='重新開始';
-    document.getElementById('resBtn').onclick=()=>location.reload();
+// ===== SOLVE PHASE =====
+function startSolving(fl){
+  document.getElementById('bot').style.display='none';
+  document.getElementById('scanHud').style.display='none';
+  document.getElementById('solvingOv').classList.add('show');
+  solverCallback=(err,sol)=>{
+    document.getElementById('solvingOv').classList.remove('show');
+    if(err){showScanResult(false,'無法解題: '+err.message);return;}
+    if(!sol||!sol.trim()){document.getElementById('completeScr').classList.add('show');return;}
+    solution=sol.trim().split(/\s+/);
+    solveStep=-1;
+    // Init internal cube state = the scanned colors
+    ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
+    mode='solve';
+    showSolveUI();
+  };
+  solverWorker.postMessage({type:'solve',fl:fl});
+}
+
+function showSolveUI(){
+  document.getElementById('moveBox').classList.add('show');
+  // Build step dots
+  const dotsEl=document.getElementById('mDots');
+  dotsEl.innerHTML=solution.map((m,i)=>`<div class="mv-d" id="sd${i}">${m}</div>`).join('');
+  if(solveStep===-1){
+    // Show initial state - tell user to put cube back facing camera
+    document.getElementById('mFace').textContent='🔍';
+    document.getElementById('mDesc').textContent='把魔方放回鏡頭前（紅色面對鏡頭）';
+    document.getElementById('mProg').textContent=`共 ${solution.length} 步`;
+    document.getElementById('bot').style.display='block';
+    document.getElementById('sts').textContent='對準後靜止 → 開始第 1 步';
+    document.getElementById('dg').style.display='none';
+    // Wait for still detection to confirm initial position (verify F face matches scan)
+    startVerifyWithColor(()=>{nextSolveStep();}, cubeState['F']);
   }
 }
 
-// Wake lock
+function nextSolveStep(){
+  solveStep++;
+  if(solveStep>=solution.length){
+    document.getElementById('moveBox').classList.remove('show');
+    document.getElementById('bot').style.display='none';
+    document.getElementById('perspGuide').classList.remove('show');
+    document.getElementById('completeScr').classList.add('show');
+    return;
+  }
+  const mv=solution[solveStep];
+  const face=mv[0];
+  
+  // Capture F face BEFORE this move (for B-move verification)
+  const fFaceBefore=[...cubeState['F']];
+  
+  // Update internal cube state
+  applyMoveToCubeState(mv);
+  
+  // The expected F face AFTER this move
+  const fFaceAfter=[...cubeState['F']];
+  
+  // Update UI
+  document.getElementById('mFace').textContent=mv;
+  document.getElementById('mDesc').textContent=MOVE_DESC[mv]||mv;
+  document.getElementById('mProg').textContent=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+  // Update dots
+  solution.forEach((_,i)=>{
+    const d=document.getElementById('sd'+i);
+    if(!d)return;
+    d.className='mv-d'+(i===solveStep?' act':'')+(i<solveStep?' dn':'');
+  });
+  // Draw move guide on overlay
+  drawMoveGuide(mv);
+  // Show perspective guide for B/D
+  if(face==='B'||face==='D'){
+    document.getElementById('perspGuide').classList.add('show');
+    drawPerspGuide(mv);
+  }else{
+    document.getElementById('perspGuide').classList.remove('show');
+  }
+  // Show expected F face after this move
+  showExpectedFace();
+  // Start verification — ALL 6 faces use camera verification
+  document.getElementById('sts').textContent='轉完後放回框框，保持不動';
+  if(face==='B'){
+    // B: F face must stay UNCHANGED (verify == fFaceBefore)
+    startVerifyWithColor(()=>{ nextSolveStep(); }, fFaceBefore);
+  }else{
+    // F/U/D/R/L: F face must match fFaceAfter
+    startVerifyWithColor(()=>{ nextSolveStep(); }, fFaceAfter);
+  }
+}
+
+// ===== EXPECTED F FACE =====
+function showExpectedFace(){
+  const expected=cubeState['F'];
+  const dg=document.getElementById('dg');dg.style.display='grid';
+  dg.innerHTML=expected.map(c=>`<div class="mini-cell" style="background:${CMAP[c]||'#333'}"></div>`).join('');
+}
+
+// ===== COLOR VERIFICATION (all faces) =====
+let verifyCallback=null;
+let verifyIntv=null;
+let verifyExpected=null; // the 9 colors we expect to see on F face
+let retryCount=0;
+
+function startVerifyWithColor(cb, expectedColors){
+  verifyCallback=cb;
+  verifyExpected=expectedColors;
+  retryCount=0;
+  stillCnt=0;prevFrame=null;scanning=true;
+  if(verifyIntv)clearInterval(verifyIntv);
+  verifyIntv=setInterval(verifyTickColor,200);
+}
+
+function verifyTickColor(){
+  if(!scanning||!vid.videoWidth)return;
+  sctx.drawImage(vid,0,0,64,64);
+  const fr=sctx.getImageData(0,0,64,64);
+  if(prevFrame){
+    let diff=0;const tot=fr.data.length/4;
+    for(let i=0;i<fr.data.length;i+=4){
+      const d=(Math.abs(fr.data[i]-prevFrame.data[i])+Math.abs(fr.data[i+1]-prevFrame.data[i+1])+Math.abs(fr.data[i+2]-prevFrame.data[i+2]))/3;
+      if(d>18)diff++;
+    }
+    if(diff/tot<STILL_TH){
+      stillCnt++;
+      document.getElementById('sts').textContent=`靜止中 ${'●'.repeat(Math.min(stillCnt,STILL_N))}${'○'.repeat(Math.max(0,STILL_N-stillCnt))}`;
+      if(stillCnt>=STILL_N){
+        scanning=false;clearInterval(verifyIntv);
+        if(navigator.vibrate)navigator.vibrate(50);
+        // Capture and verify F face colors
+        verifyFaceColors();
+        return;
+      }
+    }else{
+      stillCnt=0;
+      document.getElementById('sts').textContent='轉完後放回框框，保持不動';
+    }
+  }
+  prevFrame=fr;
+  if(mode==='solve'&&solveStep>=0) drawSolveOv();
+  else drawScanOv();
+}
+
+function verifyFaceColors(){
+  // Sample 9 RGB values from camera
+  const vw=vid.videoWidth,vh=vid.videoHeight;
+  const tc=document.createElement('canvas');tc.width=vw;tc.height=vh;
+  const tctx=tc.getContext('2d');tctx.drawImage(vid,0,0,vw,vh);
+  const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
+
+  let capturedRGBs=[];
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
+    const d=tctx.getImageData(px-5,py-5,11,11);
+    let rr=0,gg=0,bb=0;
+    for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
+    const n=d.data.length/4;
+    capturedRGBs.push([Math.round(rr/n),Math.round(gg/n),Math.round(bb/n)]);
+  }
+
+  // Classify captured colors using scan-phase anchors
+  const anchors={};
+  ['U','R','F','D','L','B'].forEach(f=>{
+    if(rawData[f])anchors[CC[f]]=rawData[f][4];
+  });
+
+  let capturedColors=capturedRGBs.map(([r,g,b])=>{
+    let best=null,bd=Infinity;
+    Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{
+      const dist=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);
+      if(dist<bd){bd=dist;best=c;}
+    });
+    return best||'?';
+  });
+
+  // Compare with expected F face (passed via verifyExpected)
+  const expected=verifyExpected;
+  let matchCount=0;
+  for(let i=0;i<9;i++){
+    if(capturedColors[i]===expected[i]) matchCount++;
+  }
+
+  // Show comparison in mini grid
+  const dg=document.getElementById('dg');dg.style.display='grid';
+  dg.innerHTML=capturedColors.map((c,i)=>{
+    const ok=c===expected[i];
+    const border=ok?'2px solid #00D2FF':'2px solid #E94560';
+    return `<div class="mini-cell" style="background:${CMAP[c]||'#333'};border:${border}"></div>`;
+  }).join('');
+
+  if(matchCount>=7){
+    // Good enough (allow 2 mismatches for lighting tolerance)
+    document.getElementById('sts').textContent=`✅ 驗證通過 (${matchCount}/9)`;
+    if(navigator.vibrate)navigator.vibrate([50,50,50]);
+    setTimeout(()=>{if(verifyCallback)verifyCallback();},600);
+  }else{
+    retryCount++;
+    if(retryCount>=3){
+      // After 3 retries, let them pass anyway (avoid infinite loop)
+      document.getElementById('sts').textContent=`⚠️ 跳過驗證，繼續下一步`;
+      if(navigator.vibrate)navigator.vibrate(200);
+      setTimeout(()=>{if(verifyCallback)verifyCallback();},1000);
+    }else{
+      // Mismatch — ask to retry
+      document.getElementById('sts').textContent=`❌ 好像不對 (${matchCount}/9)，請確認後再靜止`;
+      if(navigator.vibrate)navigator.vibrate([100,100,100,100,100]);
+      // Restart still detection for another attempt
+      setTimeout(()=>{
+        stillCnt=0;prevFrame=null;scanning=true;
+        if(verifyIntv)clearInterval(verifyIntv);
+        verifyIntv=setInterval(verifyTickColor,200);
+      },1500);
+    }
+  }
+}
+
+// ===== DRAW MOVE GUIDE ON CAMERA OVERLAY =====
+function drawMoveGuide(mv){
+  // This is called once when the step starts.
+  // The actual overlay is drawn continuously in drawSolveOv()
+}
+function drawSolveOv(){
+  const vw=ov.width,vh=ov.height;
+  octx.clearRect(0,0,vw,vh);
+  const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
+  // Dim outside
+  octx.fillStyle='rgba(0,0,0,0.2)';
+  octx.fillRect(0,0,vw,sy);octx.fillRect(0,sy+gs,vw,vh-sy-gs);
+  octx.fillRect(0,sy,sx,gs);octx.fillRect(sx+gs,sy,vw-sx-gs,gs);
+  // Grid
+  octx.strokeStyle='rgba(255,215,0,0.3)';octx.lineWidth=1;
+  for(let i=0;i<=3;i++){
+    octx.beginPath();octx.moveTo(sx+i*cs,sy);octx.lineTo(sx+i*cs,sy+gs);octx.stroke();
+    octx.beginPath();octx.moveTo(sx,sy+i*cs);octx.lineTo(sx+gs,sy+i*cs);octx.stroke();
+  }
+  if(solveStep<0||solveStep>=solution.length)return;
+  const mv=solution[solveStep];
+  const face=mv[0], prime=mv.includes("'"), dbl=mv.includes('2');
+  // Draw arrows on the camera overlay showing which part to turn
+  // The camera sees the F face. We draw arrows on the relevant edges.
+  octx.strokeStyle='#FFD700';octx.lineWidth=3;octx.lineCap='round';
+  const arrowColor='#FFD700';
+  switch(face){
+    case 'F':drawFaceArrow(sx,sy,gs,prime,dbl);break;
+    case 'U':drawTopArrow(sx,sy,gs,cs,prime,dbl);break;
+    case 'D':drawBottomArrow(sx,sy,gs,cs,prime,dbl);break;
+    case 'R':drawRightArrow(sx,sy,gs,cs,prime,dbl);break;
+    case 'L':drawLeftArrow(sx,sy,gs,cs,prime,dbl);break;
+    case 'B':drawBackArrow(sx,sy,gs,cs,prime,dbl);break;
+  }
+  // Still ring
+  if(stillCnt>0){
+    octx.strokeStyle='#00D2FF';octx.lineWidth=3;
+    octx.beginPath();octx.arc(sx+gs/2,sy+gs/2,gs/2+12,-Math.PI/2,-Math.PI/2+(stillCnt/STILL_N)*Math.PI*2);octx.stroke();
+  }
+}
+
+// Arrow drawing helpers
+function drawFaceArrow(sx,sy,gs,prime,dbl){
+  // Full face rotation arrow around the 3x3 grid
+  const cx=sx+gs/2,cy=sy+gs/2,r=gs*0.42;
+  const dir=prime?-1:1;
+  const total=dbl?Math.PI*1.5:Math.PI*0.85;
+  const start=-total/2;
+  octx.beginPath();
+  for(let i=0;i<=20;i++){
+    const a=start+(total*i/20)*dir;
+    const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
+    i===0?octx.moveTo(px,py):octx.lineTo(px,py);
+  }
+  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
+  // Arrowhead
+  const ea=start+total*dir;
+  const tx=cx+Math.cos(ea)*r,ty=cy+Math.sin(ea)*r;
+  const pa=start+total*0.85*dir;
+  const px=cx+Math.cos(pa)*r,py=cy+Math.sin(pa)*r;
+  drawArrowHead(tx,ty,tx-px,ty-py);
+}
+function drawTopArrow(sx,sy,gs,cs,prime,dbl){
+  // U layer = top row of F face. Draw horizontal arrow above the grid
+  const y=sy-8;const x1=sx+cs*0.5,x2=sx+gs-cs*0.5;
+  octx.beginPath();
+  if(prime){octx.moveTo(x2,y);octx.lineTo(x1,y);drawArrowHead(x1,y,-1,0);}
+  else{octx.moveTo(x1,y);octx.lineTo(x2,y);drawArrowHead(x2,y,1,0);}
+  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
+  // Highlight top row
+  octx.fillStyle='rgba(255,215,0,0.15)';octx.fillRect(sx,sy,gs,cs);
+  // Label
+  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
+  octx.fillText('U 上層',sx+gs/2,sy-16);
+}
+function drawBottomArrow(sx,sy,gs,cs,prime,dbl){
+  const y=sy+gs+8;const x1=sx+cs*0.5,x2=sx+gs-cs*0.5;
+  octx.beginPath();
+  if(prime){octx.moveTo(x1,y);octx.lineTo(x2,y);drawArrowHead(x2,y,1,0);}
+  else{octx.moveTo(x2,y);octx.lineTo(x1,y);drawArrowHead(x1,y,-1,0);}
+  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
+  octx.fillStyle='rgba(255,215,0,0.15)';octx.fillRect(sx,sy+gs-cs,gs,cs);
+  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
+  octx.fillText('D 下層（看不到）',sx+gs/2,sy+gs+28);
+}
+function drawRightArrow(sx,sy,gs,cs,prime,dbl){
+  const x=sx+gs+8;const y1=sy+cs*0.5,y2=sy+gs-cs*0.5;
+  octx.beginPath();
+  if(prime){octx.moveTo(x,y2);octx.lineTo(x,y1);drawArrowHead(x,y1,0,-1);}
+  else{octx.moveTo(x,y1);octx.lineTo(x,y2);drawArrowHead(x,y2,0,1);}
+  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
+  octx.fillStyle='rgba(255,215,0,0.15)';octx.fillRect(sx+gs-cs,sy,cs,gs);
+  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
+  octx.fillText('R',sx+gs+20,sy+gs/2+5);
+}
+function drawLeftArrow(sx,sy,gs,cs,prime,dbl){
+  const x=sx-8;const y1=sy+cs*0.5,y2=sy+gs-cs*0.5;
+  octx.beginPath();
+  if(!prime){octx.moveTo(x,y2);octx.lineTo(x,y1);drawArrowHead(x,y1,0,-1);}
+  else{octx.moveTo(x,y1);octx.lineTo(x,y2);drawArrowHead(x,y2,0,1);}
+  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
+  octx.fillStyle='rgba(255,215,0,0.15)';octx.fillRect(sx,sy,cs,gs);
+  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
+  octx.fillText('L',sx-20,sy+gs/2+5);
+}
+function drawBackArrow(sx,sy,gs,cs,prime,dbl){
+  // B layer is the far layer — not visible. Show dashed outline + text
+  octx.setLineDash([6,4]);
+  octx.strokeStyle='rgba(255,215,0,0.4)';octx.lineWidth=2;
+  octx.strokeRect(sx-4,sy-4,gs+8,gs+8);
+  octx.setLineDash([]);
+  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
+  octx.fillText('B 後層（看不到，見右下圖）',sx+gs/2,sy-12);
+}
+function drawArrowHead(x,y,dx,dy){
+  const len=Math.sqrt(dx*dx+dy*dy)||1;
+  const ux=dx/len,uy=dy/len;
+  const hl=12,hw=7;
+  octx.beginPath();
+  octx.moveTo(x+ux*2,y+uy*2);
+  octx.lineTo(x-hl*ux+hw*uy,y-hl*uy-hw*ux);
+  octx.lineTo(x-hl*ux-hw*uy,y-hl*uy+hw*ux);
+  octx.closePath();
+  octx.fillStyle='#FFD700';octx.fill();
+}
+
+// ===== PERSPECTIVE GUIDE for B/D =====
+function drawPerspGuide(mv){
+  const c=document.getElementById('perspCanvas');
+  const ctx=c.getContext('2d');
+  const w=c.width,h=c.height;
+  ctx.clearRect(0,0,w,h);
+  const face=mv[0],prime=mv.includes("'"),dbl=mv.includes('2');
+  
+  if(face==='B'){
+    // Draw isometric view from behind: show 3 layers, highlight back layer
+    // Layer 1 (front/nearest) - faded
+    ctx.fillStyle='rgba(255,255,255,0.1)';
+    ctx.fillRect(10,15,22,70);
+    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=0.5;
+    ctx.strokeRect(10,15,22,70);
+    // Layer 2 (mid) - faded
+    ctx.fillRect(36,15,22,70);
+    ctx.strokeRect(36,15,22,70);
+    // Layer 3 (back) - highlighted
+    ctx.fillStyle='rgba(255,140,0,0.3)';
+    ctx.fillRect(62,15,28,70);
+    ctx.strokeStyle='#FF5800';ctx.lineWidth=1.5;
+    ctx.strokeRect(62,15,28,70);
+    // Arrow on back layer
+    const cx=76,cy=50,r=16;
+    const dir=prime?-1:1;
+    ctx.beginPath();
+    for(let i=0;i<=12;i++){
+      const a=-Math.PI*0.6+(Math.PI*1.2*i/12)*dir;
+      const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.strokeStyle='#FFD700';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.stroke();
+    // Labels
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='8px sans-serif';ctx.textAlign='center';
+    ctx.fillText('近',21,90);ctx.fillText('中',47,90);
+    ctx.fillStyle='#FFD700';ctx.fillText('遠(轉這層)',76,90);
+  }
+  if(face==='D'){
+    // Top-down-ish view showing 3 horizontal layers, highlight bottom
+    ctx.fillStyle='rgba(255,255,255,0.1)';
+    ctx.fillRect(15,10,70,22);
+    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=0.5;
+    ctx.strokeRect(15,10,70,22);
+    ctx.fillRect(15,36,70,22);
+    ctx.strokeRect(15,36,70,22);
+    // Bottom layer highlighted
+    ctx.fillStyle='rgba(255,215,0,0.3)';
+    ctx.fillRect(15,62,70,28);
+    ctx.strokeStyle='#FFD500';ctx.lineWidth=1.5;
+    ctx.strokeRect(15,62,70,28);
+    // Arrow
+    const cx=50,cy=76,r=16;
+    const dir=prime?-1:1;
+    ctx.beginPath();
+    for(let i=0;i<=12;i++){
+      const a=-Math.PI*0.6+(Math.PI*1.2*i/12)*dir;
+      const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.strokeStyle='#FFD700';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='8px sans-serif';ctx.textAlign='center';
+    ctx.fillText('上',50,8);ctx.fillText('中',50,55);
+    ctx.fillStyle='#FFD700';ctx.fillText('下(轉這層)',50,98);
+  }
+}
+
+// ===== CUBE STATE MANIPULATION =====
+function rotateCW(face){
+  const f=cubeState[face];
+  cubeState[face]=[f[6],f[3],f[0],f[7],f[4],f[1],f[8],f[5],f[2]];
+}
+function cycleEdges(face){
+  const s=cubeState;let t;
+  switch(face){
+    case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.R[0];s.F[1]=s.R[1];s.F[2]=s.R[2];s.R[0]=s.B[0];s.R[1]=s.B[1];s.R[2]=s.B[2];s.B[0]=s.L[0];s.B[1]=s.L[1];s.B[2]=s.L[2];s.L[0]=t[0];s.L[1]=t[1];s.L[2]=t[2];break;
+    case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.L[6];s.F[7]=s.L[7];s.F[8]=s.L[8];s.L[6]=s.B[6];s.L[7]=s.B[7];s.L[8]=s.B[8];s.B[6]=s.R[6];s.B[7]=s.R[7];s.B[8]=s.R[8];s.R[6]=t[0];s.R[7]=t[1];s.R[8]=t[2];break;
+    case'R':t=[s.F[2],s.F[5],s.F[8]];s.F[2]=s.D[2];s.F[5]=s.D[5];s.F[8]=s.D[8];s.D[2]=s.B[6];s.D[5]=s.B[3];s.D[8]=s.B[0];s.B[6]=s.U[2];s.B[3]=s.U[5];s.B[0]=s.U[8];s.U[2]=t[0];s.U[5]=t[1];s.U[8]=t[2];break;
+    case'L':t=[s.F[0],s.F[3],s.F[6]];s.F[0]=s.U[0];s.F[3]=s.U[3];s.F[6]=s.U[6];s.U[0]=s.B[8];s.U[3]=s.B[5];s.U[6]=s.B[2];s.B[8]=s.D[0];s.B[5]=s.D[3];s.B[2]=s.D[6];s.D[0]=t[0];s.D[3]=t[1];s.D[6]=t[2];break;
+    case'F':t=[s.U[6],s.U[7],s.U[8]];s.U[6]=s.L[8];s.U[7]=s.L[5];s.U[8]=s.L[2];s.L[2]=s.D[0];s.L[5]=s.D[1];s.L[8]=s.D[2];s.D[0]=s.R[6];s.D[1]=s.R[3];s.D[2]=s.R[0];s.R[0]=t[0];s.R[3]=t[1];s.R[6]=t[2];break;
+    case'B':t=[s.U[0],s.U[1],s.U[2]];s.U[0]=s.R[2];s.U[1]=s.R[5];s.U[2]=s.R[8];s.R[2]=s.D[8];s.R[5]=s.D[7];s.R[8]=s.D[6];s.D[8]=s.L[6];s.D[7]=s.L[3];s.D[6]=s.L[0];s.L[0]=t[0];s.L[3]=t[1];s.L[6]=t[2];break;
+  }
+}
+function applyMoveToCubeState(mv){
+  const face=mv[0],prime=mv.includes("'"),dbl=mv.includes('2');
+  const n=dbl?2:(prime?3:1);
+  for(let i=0;i<n;i++){rotateCW(face);cycleEdges(face);}
+}
+
+// ===== WAKE LOCK =====
 (async()=>{try{await navigator.wakeLock.request('screen')}catch(e){}})();
 </script>
 </body>
