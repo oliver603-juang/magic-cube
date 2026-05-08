@@ -2264,7 +2264,7 @@ function mkDots(){
 }
 // ===== CUBE DETECTION =====
 // Check if a Rubik's cube is present inside the guide frame
-// Uses two signals: (1) color variance across 9 cells, (2) dark grid lines
+// Uses: (1) color variance across 9 cells, (2) saturation count (cube has vivid colors)
 function detectCubeInFrame(){
   if(!vid.videoWidth) return false;
   const vw=vid.videoWidth, vh=vid.videoHeight;
@@ -2284,7 +2284,7 @@ function detectCubeInFrame(){
     rgbs.push([rr/n, gg/n, bb/n]);
   }
 
-  // Signal 1: Color variance — cube has different colors, empty background is uniform
+  // Signal 1: Color variance — cube has many colors, background is uniform
   const avgR=rgbs.reduce((s,c)=>s+c[0],0)/9;
   const avgG=rgbs.reduce((s,c)=>s+c[1],0)/9;
   const avgB=rgbs.reduce((s,c)=>s+c[2],0)/9;
@@ -2294,29 +2294,34 @@ function detectCubeInFrame(){
   });
   variance/=9;
 
-  // Signal 2: Dark grid lines between cells — sample points on grid intersections
-  let darkCount=0, gridSamples=0;
-  for(let r=0;r<=3;r++) for(let c=0;c<=3;c++){
-    // Skip corners (might be outside cube)
-    if((r===0||r===3)&&(c===0||c===3)) continue;
-    const px=Math.round(sx+c*cs), py=Math.round(sy+r*cs);
-    if(px<0||px>=vw||py<0||py>=vh) continue;
-    const d=tctx.getImageData(px-1,py-1,3,3);
-    let bright=0;
-    for(let i=0;i<d.data.length;i+=4){
-      bright+=(d.data[i]+d.data[i+1]+d.data[i+2])/3;
+  // Signal 2: Saturation count AND distinct hue count
+  // Cube has vivid colors in multiple hues (R,G,B,O,Y)
+  // Wood desk may have high saturation but only one hue (brown)
+  let highSatCount=0;
+  const hueBuckets=new Set();
+  rgbs.forEach(([r,g,b])=>{
+    const mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+    const sat=(mx>10)?(mx-mn)/mx:0;
+    if(sat>0.3){
+      highSatCount++;
+      // Compute hue bucket (50° per bucket)
+      const rf=r/255,gf=g/255,bf=b/255;
+      const d=mx/255-mn/255;
+      let h=0;
+      if(d>0.01){
+        if(mx===r) h=60*(((gf-bf)/d+6)%6);
+        else if(mx===g) h=60*((bf-rf)/d+2);
+        else h=60*((rf-gf)/d+4);
+      }
+      hueBuckets.add(Math.floor(h/50));
     }
-    bright/=(d.data.length/4);
-    gridSamples++;
-    if(bright<60) darkCount++; // dark pixel = black grid line
-  }
+  });
 
-  const darkRatio=gridSamples>0?darkCount/gridSamples:0;
-
-  // Cube detected if: high color variance OR dark grid lines visible
-  // Variance threshold: a single-color background has variance ~0, cube has >500
-  // Dark ratio threshold: cube grid lines make >30% of intersection points dark
-  const hasCube = variance > 400 || darkRatio > 0.25;
+  // Cube detected if ALL three conditions met:
+  // 1. High color variance (different brightnesses/colors across cells)
+  // 2. At least 3 cells have vivid color (not gray/white)
+  // 3. At least 3 distinct hue families (not just one color like brown wood)
+  const hasCube = variance > 1000 && highSatCount >= 3 && hueBuckets.size >= 3;
 
   return hasCube;
 }
