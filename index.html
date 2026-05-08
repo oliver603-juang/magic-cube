@@ -90,7 +90,8 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
       用相機掃描 6 面 → 自動最佳解 → 一步步教你還原<br>全程白色朝上！
     </div>
     <button class="btn" style="margin-top:16px" onclick="startApp()">📸 開始掃描</button>
-    <button class="btn" style="margin-top:8px;background:rgba(0,210,255,.85)" onclick="showDojo()">💪 肌肉記憶道場</button>
+    <button class="btn" style="margin-top:8px;background:rgba(0,210,255,.85)" onclick="startLBLDirect()">📚 LBL 逆向教學</button>
+    <button class="btn" style="margin-top:8px;background:rgba(255,255,255,.15);color:#ccc" onclick="showDojo()">💪 肌肉記憶道場</button>
   </div>
 
   <!-- Muscle Memory Dojo -->
@@ -2225,9 +2226,14 @@ function initSolver(){
   solverWorker=new Worker(URL.createObjectURL(new Blob([code],{type:'application/javascript'})));
   solverReady=false;
   solverWorker.onmessage=e=>{
-    if(e.data.t==='ok'){solverReady=true;}
+    if(e.data.t==='ok'){solverReady=true;console.log('[solver] Worker ready');}
     if(e.data.t==='sol'&&solverCB)solverCB(null,e.data.s);
     if(e.data.t==='err'&&solverCB)solverCB(new Error(e.data.m));
+  };
+  solverWorker.onerror=e=>{
+    console.error('[solver] Worker error:',e.message);
+    solverReady=true; // unblock the wait loop
+    if(solverCB)solverCB(new Error('Worker crashed: '+e.message));
   };
   solverWorker.postMessage({t:'init'});
 }
@@ -2549,22 +2555,32 @@ function tryAutoRepair(fl, nonC, ambiguous, attempt){
     return;
   }
 
-  document.getElementById('info').textContent=attempt===0?'驗證中...':'修正嘗試 '+(attempt)+'...';
+  const dbg=s=>{document.getElementById('info').textContent=s;console.log('[solver]',s);};
+  dbg(attempt===0?'驗證中... 初始化求解器':'修正嘗試 '+(attempt)+' 初始化求解器');
 
   // Kill old worker and create new one
   if(solverWorker) solverWorker.terminate();
   initSolver();
 
-  // Wait for solver to be ready, then send solve
+  // Wait for solver ready with safety timeout
+  let waitCount=0;
   function sendWhenReady(){
+    waitCount++;
     if(solverReady){
+      dbg(attempt===0?'求解器就緒，驗證中...':'修正嘗試 '+attempt+' 求解中...');
       doSend();
+    }else if(waitCount>100){
+      // 10 seconds timeout for init
+      dbg('求解器初始化超時，重試...');
+      tryAutoRepair(fl, nonC, ambiguous, attempt);
     }else{
       setTimeout(sendWhenReady,100);
     }
   }
   function doSend(){
+    dbg('發送求解請求... fl='+fl.substring(0,12)+'...');
     const solveTimeout=setTimeout(()=>{
+      dbg('求解超時(4s)，嘗試修正 #'+(attempt+1));
       // Solver timed out = invalid state. Kill it.
       solverWorker.terminate();
       solverCB=null;
@@ -2615,14 +2631,17 @@ function tryAutoRepair(fl, nonC, ambiguous, attempt){
     solverCB=(err,sol)=>{
       clearTimeout(solveTimeout);
       if(err){
+        dbg('求解錯誤: '+err.message+', 重試...');
         tryAutoRepair(fl, nonC, ambiguous, attempt+1);
         return;
       }
       if(!sol||!sol.trim()){
+        dbg('已解完（空解）');
         document.getElementById('doneOv').classList.add('show');
         return;
       }
       solution=sol.trim().split(/\s+/);
+      dbg('✅ 求解成功！'+solution.length+'步');
       document.getElementById('info').innerHTML=`✅ 驗證成功！${attempt>0?'(修正了'+attempt+'次)':''}`;
       showFacePreviews('mgrid');
       document.getElementById('btnRow').innerHTML=
@@ -2647,6 +2666,20 @@ function startSolveMode(){
 }
 
 // ===== LBL TEACHING MODE =====
+// Direct LBL entry from home screen (no scan needed)
+function startLBLDirect(){
+  document.getElementById('startOv').classList.remove('show');
+  mode='lbl';
+  document.querySelector('.wrap').style.background='#000';
+  if(vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;}
+  vid.style.display='none';
+  if(ov)ov.style.display='none';
+  document.getElementById('botBar').style.display='none';
+  document.getElementById('topBar').style.display='none';
+  document.getElementById('solveUI').style.display='flex';
+  showLBLIntro();
+}
+
 function startLBLMode(){
   mode='lbl';
   if(vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;}
