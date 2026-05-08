@@ -80,6 +80,11 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
     </div>
   </div>
 
+  <!-- LBL intro/selection UI (separate from solve step UI) -->
+  <div id="lblUI" style="display:none;position:absolute;inset:0;z-index:10;background:#000;align-items:center;justify-content:center;overflow-y:auto">
+    <div id="lblContent"></div>
+  </div>
+
   <div class="persp" id="persp"><canvas id="perspC" width="92" height="92"></canvas></div>
 
   <!-- Start -->
@@ -2757,6 +2762,7 @@ function startLBLDirect(){
   if(ov)ov.style.display='none';
   document.getElementById('botBar').style.display='none';
   document.getElementById('topBar').style.display='none';
+  document.getElementById('solveUI').style.display='none';
   showLBLIntro();
 }
 
@@ -2842,8 +2848,9 @@ function generateLBLScramble(targetStage){
 
 // Show LBL intro screen with level selection
 function showLBLIntro(){
-  const solveUI=document.getElementById('solveUI');
-  solveUI.style.display='flex';
+  document.getElementById('solveUI').style.display='none';
+  const lblUI=document.getElementById('lblUI');
+  lblUI.style.display='flex';
   
   let html='<div style="width:100%;max-width:360px;margin:0 auto;text-align:center;overflow-y:auto;padding:10px 0">';
   html+='<div style="font-size:22px;font-weight:900;color:#FFD700;margin-bottom:4px">📚 學習解魔方</div>';
@@ -2877,7 +2884,7 @@ function showLBLIntro(){
   html+='</div>';
   
   html+='</div>';
-  solveUI.innerHTML=html;
+  document.getElementById('lblContent').innerHTML=html;
 }
 
 // Start LBL practice for a given starting stage
@@ -2907,7 +2914,7 @@ function startLBLPractice(fromStage){
 
 // Item 1: Step-by-step scramble guide using the same solve UI (not a text wall)
 function showLBLScrambleGuide(targetState, teachSteps, fromStage){
-  const solveUI=document.getElementById('solveUI');
+  const lblUI=document.getElementById('lblUI');
   const result=generateLBLScramble(fromStage);
   const allScrambleMoves=[];
   result.stageBreaks.forEach(b=>allScrambleMoves.push(...b.moves.trim().split(/\s+/)));
@@ -2932,11 +2939,12 @@ function showLBLScrambleGuide(targetState, teachSteps, fromStage){
   html+='<button class="btn" onclick="startLBLScrambleGuide()">▶ 開始一步步打亂</button>';
   html+='<div style="margin-top:8px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="showLBLIntro()">← 返回</button></div>';
   html+='</div>';
-  solveUI.innerHTML=html;
+  document.getElementById('lblContent').innerHTML=html;
 }
 
 // Guided scramble: reuse the solve step UI
 function startLBLScrambleGuide(){
+  document.getElementById('lblUI').style.display='none';
   const scrambleMoves=window._lblScrambleMoves;
   const solvedState={U:['W','W','W','W','W','W','W','W','W'],R:['B','B','B','B','B','B','B','B','B'],F:['R','R','R','R','R','R','R','R','R'],D:['Y','Y','Y','Y','Y','Y','Y','Y','Y'],L:['G','G','G','G','G','G','G','G','G'],B:['O','O','O','O','O','O','O','O','O']};
   solution=scrambleMoves;
@@ -2951,6 +2959,7 @@ function startLBLScrambleGuide(){
 
 // Start the LBL solve phase (after scramble is done)
 function startLBLSolveGuide(){
+  document.getElementById('lblUI').style.display='none';
   const teachSteps=window._lblTeachSteps;
   if(!teachSteps||teachSteps.length===0)return;
   const flatMoves=[];
@@ -3012,9 +3021,10 @@ function showSolveStep(){
     if(window._lblScramblePhase){
       window._lblScramblePhase=false;
       showConfetti();
-      const solveUI=document.getElementById('solveUI');
-      solveUI.style.display='flex';
-      solveUI.innerHTML='<div style="width:100%;max-width:360px;margin:0 auto;text-align:center;padding:20px 0">'+
+      document.getElementById('solveUI').style.display='none';
+      const lblUI2=document.getElementById('lblUI');
+      lblUI2.style.display='flex';
+      document.getElementById('lblContent').innerHTML='<div style="width:100%;max-width:360px;margin:0 auto;text-align:center;padding:20px 0">'+
         '<div style="font-size:40px;margin-bottom:8px">✅</div>'+
         '<div style="font-size:18px;font-weight:900;color:#FFD700;margin-bottom:8px">打亂完成！</div>'+
         '<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:16px;line-height:1.5">現在看看你的魔方<br>準備好用 LBL 公式把它還原！</div>'+
