@@ -2212,7 +2212,7 @@ function drawGuideGrid(){
   if(!ov.width)return;
   const vw=ov.width,vh=ov.height;
   octx.clearRect(0,0,vw,vh);
-  const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
+  const gs=Math.min(vw,vh)*0.82,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
   octx.fillStyle='rgba(0,0,0,.25)';
   octx.fillRect(0,0,vw,sy);octx.fillRect(0,sy+gs,vw,vh-sy-gs);
   octx.fillRect(0,sy,sx,gs);octx.fillRect(sx+gs,sy,vw-sx-gs,gs);
@@ -2234,7 +2234,7 @@ function doScanCapture(){
   const vw=vid.videoWidth,vh=vid.videoHeight;
   const tc=document.createElement('canvas');tc.width=vw;tc.height=vh;
   const tctx=tc.getContext('2d');tctx.drawImage(vid,0,0,vw,vh);
-  const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
+  const gs=Math.min(vw,vh)*0.82,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
 
   let rgbs=[];
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){
@@ -2288,7 +2288,8 @@ function doClassify(){
   if(!ok){showError('顏色數量不對: '+JSON.stringify(fcnt));return;}
 
   // Show result briefly then solve
-  document.getElementById('info').textContent='顏色分析完成 ✅';
+  const anchorStr=Object.entries(anchors).map(([c,[r,g,b]])=>`${c}=(${r},${g},${b})`).join(' ');
+  document.getElementById('info').innerHTML=`顏色分析完成 ✅<br><span style="font-size:9px;color:rgba(255,255,255,.4)">Facelet: ${fl}<br>Anchors: ${anchorStr}</span>`;
   showFacePreviews('mgrid');
   document.getElementById('btnRow').innerHTML=`<button class="btn" onclick="doSolve('${fl}')">🚀 開始解題</button>`;
 }
@@ -2318,10 +2319,27 @@ function showError(msg){
 // ===== SOLVE =====
 function doSolve(fl){
   document.getElementById('botBar').style.display='none';
-  document.getElementById('solveOv').classList.add('show');
+  const solveOvEl=document.getElementById('solveOv');
+  solveOvEl.classList.add('show');
+  // Show facelet for debugging
+  solveOvEl.innerHTML=`
+    <div style="font-size:40px;animation:spin 1s linear infinite">⚙️</div>
+    <div style="font-size:16px;font-weight:800;color:#FFD700;margin-top:10px">計算最佳解中...</div>
+    <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:8px;word-break:break-all;max-width:300px;text-align:center">Facelet: ${fl}</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:6px" id="solveStatus">等待 solver...</div>
+    <button class="btn btn-sm" style="margin-top:12px;background:rgba(255,255,255,.15);color:#fff" onclick="location.reload()">取消</button>
+  `;
+
+  // Timeout: if solver doesn't respond in 15s, it's probably an invalid cube
+  const timeout=setTimeout(()=>{
+    solveOvEl.classList.remove('show');
+    showError('解題超時（15秒）- 魔方狀態可能無效\\nFacelet: '+fl);
+  },15000);
+
   solverCB=(err,sol)=>{
-    document.getElementById('solveOv').classList.remove('show');
-    if(err){showError('解題失敗: '+err.message);return;}
+    clearTimeout(timeout);
+    solveOvEl.classList.remove('show');
+    if(err){showError('解題失敗: '+err.message+'\\nFacelet: '+fl);return;}
     if(!sol||!sol.trim()){document.getElementById('doneOv').classList.add('show');return;}
     solution=sol.trim().split(/\s+/);
     solveStep=-1;
@@ -2330,6 +2348,7 @@ function doSolve(fl){
     showSolveStep();
   };
   solverWorker.postMessage({t:'solve',fl});
+  document.getElementById('solveStatus').textContent='已送出，等待計算...';
 }
 
 // ===== SOLVE STEP-BY-STEP =====
@@ -2413,7 +2432,7 @@ function drawMoveOverlay(mv){
   if(!ov.width)return;
   const vw=ov.width,vh=ov.height;
   octx.clearRect(0,0,vw,vh);
-  const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
+  const gs=Math.min(vw,vh)*0.82,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
 
   // Light grid
   octx.strokeStyle='rgba(255,215,0,.3)';octx.lineWidth=1;
