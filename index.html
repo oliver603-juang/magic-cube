@@ -2745,7 +2745,7 @@ function drawMoveDiagram(mv){
     const fs=66,cs=fs/3,fx=20,fy=35;
     const rcw=cs*0.7,rsk=7,rx=fx+fs+3,ry=fy;
     for(let r=0;r<3;r++)for(let c=0;c<3;c++)
-      svg+=`<rect x="${fx+c*cs+1}" y="${fy+r*cs+1}" width="${cs-2}" height="${cs-2}" rx="2" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.12)" stroke-width="0.5"/>`;
+      svg+=`<rect x="${fx+c*cs+1}" y="${fy+r*cs+1}" width="${cs-2}" height="${cs-2}" rx="2" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
     svg+=`<text x="${fx+fs/2}" y="${fy+fs+13}" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="sans-serif">前紅</text>`;
     for(let r=0;r<3;r++)for(let c=0;c<3;c++){
       const x=rx+c*rcw,y=ry+r*cs+c*rsk;
@@ -2767,7 +2767,7 @@ function drawMoveDiagram(mv){
   let svg=`<svg width="${tw}" height="${th}" viewBox="0 0 ${tw} ${th}">`;
   const ox=pad,oy=pad;
   for(let r=0;r<3;r++)for(let c=0;c<3;c++)
-    svg+=`<rect x="${ox+c*cs+1}" y="${oy+r*cs+1}" width="${cs-2}" height="${cs-2}" rx="3" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.12)" stroke-width="0.5"/>`;
+    svg+=`<rect x="${ox+c*cs+1}" y="${oy+r*cs+1}" width="${cs-2}" height="${cs-2}" rx="3" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
   const hl='rgba(255,215,0,.15)',hlS='rgba(255,215,0,.5)';
 
   switch(face){
