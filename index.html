@@ -97,7 +97,8 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
     <div style="font-size:40px;animation:spin 1s linear infinite">⚙️</div>
     <div style="font-size:16px;font-weight:800;color:#FFD700;margin-top:10px">計算最佳解中...</div>
   </div>
-  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes confetti-fall{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}</style>
 
   <!-- Complete -->
   <div class="overlay" id="doneOv">
@@ -2180,6 +2181,15 @@ MDESC['L']='左綠層 ↻ 往下推';MDESC["L'"]='左綠層 ↺ 往上推';MDESC
 MDESC['F']='前紅層 ↻ 順時針';MDESC["F'"]='前紅層 ↺ 逆時針';MDESC['F2']='前紅層 180°';
 MDESC['B']='後橘層 ↻ (從後看)';MDESC["B'"]='後橘層 ↺ (從後看)';MDESC['B2']='後橘層 180°';
 
+// Kid-friendly mnemonics for LBL mode
+const MDESC_KID={};
+MDESC_KID['R']='右邊 推上去 ⬆';MDESC_KID["R'"]='右邊 拉下來 ⬇';MDESC_KID['R2']='右邊 推兩次 ⬆⬆';
+MDESC_KID['U']='上面 往左推 ⬅';MDESC_KID["U'"]='上面 往右推 ➡';MDESC_KID['U2']='上面 轉半圈';
+MDESC_KID['D']='下面 往右推 ➡';MDESC_KID["D'"]='下面 往左推 ⬅';MDESC_KID['D2']='下面 轉半圈';
+MDESC_KID['L']='左邊 拉下來 ⬇';MDESC_KID["L'"]='左邊 推上去 ⬆';MDESC_KID['L2']='左邊 推兩次';
+MDESC_KID['F']='正面 順時針轉 ↻';MDESC_KID["F'"]='正面 逆時針轉 ↺';MDESC_KID['F2']='正面 轉半圈';
+MDESC_KID['B']='後面 順時針轉 ↻';MDESC_KID["B'"]='後面 逆時針轉 ↺';MDESC_KID['B2']='後面 轉半圈';
+
 let vid, ov, octx;
 let rawData={}, faceColors={}, cubeState={};
 let scanIdx=0, solution=[], solveStep=-1;
@@ -2761,77 +2771,88 @@ function startLBLPractice(fromStage){
   showLBLScrambleGuide(result.state, teachSteps, fromStage);
 }
 
-// Show the scramble instruction: tell user to set up their cube
+// Item 1: Step-by-step scramble guide using the same solve UI (not a text wall)
 function showLBLScrambleGuide(targetState, teachSteps, fromStage){
   const solveUI=document.getElementById('solveUI');
-  
-  // Calculate the scramble moves to show the user
+  const result=generateLBLScramble(fromStage);
   const allScrambleMoves=[];
-  const breaks=generateLBLScramble(fromStage).stageBreaks;
-  breaks.forEach(b=>allScrambleMoves.push(...b.moves.trim().split(/\s+/)));
-  
-  let html='<div style="width:100%;max-width:360px;margin:0 auto;text-align:center;overflow-y:auto;padding:10px 0">';
+  result.stageBreaks.forEach(b=>allScrambleMoves.push(...b.moves.trim().split(/\s+/)));
+  window._lblScrambleMoves=allScrambleMoves;
+  window._lblTeachSteps=teachSteps;
+  window._lblTargetState=targetState;
+  window._lblFromStage=fromStage;
+
+  let html='<div style="width:100%;max-width:360px;margin:0 auto;text-align:center;padding:10px 0">';
   html+='<div style="font-size:18px;font-weight:900;color:#FFD700;margin-bottom:8px">🔀 準備魔方</div>';
-  html+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:12px;line-height:1.5">拿一個<b style="color:#fff">已還原</b>的魔方<br>白色朝上，紅色朝向你<br>按順序執行以下步驟打亂它：</div>';
-  
-  // Show scramble moves as step chips
-  html+='<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:12px;margin-bottom:12px">';
-  html+='<div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center">';
-  allScrambleMoves.forEach(m=>{
-    html+='<div style="background:rgba(255,215,0,.2);color:#FFD700;padding:4px 8px;border-radius:6px;font-size:13px;font-family:monospace;font-weight:700">'+m.replace("'","'")+'</div>';
-  });
-  html+='</div>';
-  html+='<div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:6px">共 '+allScrambleMoves.length+' 步</div>';
-  html+='</div>';
-  
-  // Show target state preview
-  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">打亂後應該長這樣：</div>';
+  html+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:12px;line-height:1.6">';
+  html+='拿一個<b style="color:#fff">已還原</b>的魔方<br>白色朝上，紅色朝向你<br>跟著畫面一步步打亂（共 '+allScrambleMoves.length+' 步）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">打亂完成後應該長這樣：</div>';
   html+='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">';
   ['U','R','F','D','L','B'].forEach(f=>{
     html+='<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.3)">'+FLABEL[f]+'</div>';
     html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">';
-    targetState[f].forEach(c=>{
-      html+='<div style="width:12px;height:12px;border-radius:2px;background:'+(CMAP[c]||'#333')+'"></div>';
-    });
+    targetState[f].forEach(c=>{html+='<div style="width:12px;height:12px;border-radius:2px;background:'+(CMAP[c]||'#333')+'"></div>';});
     html+='</div></div>';
   });
   html+='</div>';
-  
-  html+='<button class="btn" onclick="startLBLSolveGuide()">✅ 我打亂好了，開始教學！</button>';
-  html+='<div style="margin-top:8px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="showLBLIntro()">← 返回選擇</button></div>';
+  html+='<button class="btn" onclick="startLBLScrambleGuide()">▶ 開始一步步打亂</button>';
+  html+='<div style="margin-top:8px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="showLBLIntro()">← 返回</button></div>';
   html+='</div>';
-  
   solveUI.innerHTML=html;
-  
-  // Store for later
-  window._lblTeachSteps=teachSteps;
-  window._lblTargetState=targetState;
 }
 
-// Start the guided solve
+// Guided scramble: reuse the solve step UI
+function startLBLScrambleGuide(){
+  const scrambleMoves=window._lblScrambleMoves;
+  const solvedState={U:['W','W','W','W','W','W','W','W','W'],R:['B','B','B','B','B','B','B','B','B'],F:['R','R','R','R','R','R','R','R','R'],D:['Y','Y','Y','Y','Y','Y','Y','Y','Y'],L:['G','G','G','G','G','G','G','G','G'],B:['O','O','O','O','O','O','O','O','O']};
+  solution=scrambleMoves;
+  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...solvedState[f]]);
+  solveStep=-1;
+  mode='solve';
+  window._lblMode=true;
+  window._lblScramblePhase=true;
+  window._lblMarkers=[{stage:0,title:'🔀 打亂魔方',tip:'跟著箭頭一步步打亂',startIdx:0,endIdx:scrambleMoves.length-1}];
+  showSolveStep();
+}
+
+// Start the LBL solve phase (after scramble is done)
 function startLBLSolveGuide(){
   const teachSteps=window._lblTeachSteps;
   if(!teachSteps||teachSteps.length===0)return;
-  
-  // Flatten all moves from all stages into one solution array
   const flatMoves=[];
-  const stageMarkers=[]; // {stage, startIdx, endIdx}
+  const stageMarkers=[];
   teachSteps.forEach(step=>{
-    const startIdx=flatMoves.length;
+    const si=flatMoves.length;
     step.moves.forEach(m=>flatMoves.push(m));
-    stageMarkers.push({stage:step.stage, title:step.title, tip:step.tip, startIdx, endIdx:flatMoves.length-1});
+    stageMarkers.push({stage:step.stage,title:step.title,tip:step.tip,startIdx:si,endIdx:flatMoves.length-1});
   });
-  
-  // Set up the standard solve UI
   solution=flatMoves;
   ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...window._lblTargetState[f]]);
   solveStep=-1;
   mode='solve';
   window._lblMode=true;
+  window._lblScramblePhase=false;
   window._lblMarkers=stageMarkers;
   showSolveStep();
 }
 
+// Item 4: Confetti celebration animation
+function showConfetti(){
+  const c=document.createElement('div');
+  c.style.cssText='position:fixed;inset:0;z-index:999;pointer-events:none;overflow:hidden';
+  const colors=['#FFD700','#00D2FF','#FF5800','#009B48','#B71234','#fff'];
+  for(let i=0;i<40;i++){
+    const p=document.createElement('div');
+    const sz=6+Math.random()*8;
+    const x=Math.random()*100;
+    const delay=Math.random()*0.5;
+    const dur=1+Math.random()*1.5;
+    p.style.cssText=`position:absolute;left:${x}%;top:-10px;width:${sz}px;height:${sz}px;background:${colors[i%colors.length]};border-radius:${Math.random()>.5?'50%':'2px'};animation:confetti-fall ${dur}s ${delay}s ease-in forwards;opacity:0.9`;
+    c.appendChild(p);
+  }
+  document.body.appendChild(c);
+  setTimeout(()=>c.remove(),3000);
+}
 
 function showSolveStep(){
   document.getElementById('persp').classList.remove('show');
@@ -2853,6 +2874,21 @@ function showSolveStep(){
   }
 
   if(solveStep>=solution.length){
+    // In LBL scramble phase: transition to solve phase
+    if(window._lblScramblePhase){
+      window._lblScramblePhase=false;
+      showConfetti();
+      const solveUI=document.getElementById('solveUI');
+      solveUI.style.display='flex';
+      solveUI.innerHTML='<div style="width:100%;max-width:360px;margin:0 auto;text-align:center;padding:20px 0">'+
+        '<div style="font-size:40px;margin-bottom:8px">✅</div>'+
+        '<div style="font-size:18px;font-weight:900;color:#FFD700;margin-bottom:8px">打亂完成！</div>'+
+        '<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:16px;line-height:1.5">現在看看你的魔方<br>準備好用 LBL 公式把它還原！</div>'+
+        '<button class="btn" onclick="startLBLSolveGuide()">🧩 開始還原教學！</button></div>';
+      return;
+    }
+    // Normal completion
+    showConfetti();
     document.getElementById('solveUI').style.display='none';
     document.getElementById('doneOv').classList.add('show');
     return;
@@ -2890,7 +2926,8 @@ function showSolveStep(){
 
   // Move label
   document.getElementById('sMoveLabel').textContent=mv;
-  document.getElementById('sMoveDesc').textContent=MDESC[mv]||mv;
+  const desc = (window._lblMode && MDESC_KID[mv]) ? MDESC_KID[mv] : (MDESC[mv]||mv);
+  document.getElementById('sMoveDesc').textContent=desc;
   
   // LBL mode: show current stage label
   let progText=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
@@ -2902,16 +2939,31 @@ function showSolveStep(){
     }
     if(currentStg){
       progText=`📚 ${currentStg.title} — 第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
-      if(currentStg.tip && solveStep===currentStg.startIdx){
+      // Show tip at stage start
+      if(solveStep===currentStg.startIdx && currentStg.tip){
         progText+=`\n💡 ${currentStg.tip}`;
       }
     }
-    // Check if this step completes a stage
-    if(currentStg && solveStep===currentStg.endIdx){
-      progText=`🎉 ${currentStg.title} 完成！`;
+    // Item 4: Confetti when completing a stage (transition to next)
+    if(currentStg && solveStep===currentStg.endIdx && solveStep<solution.length-1){
+      const nextStg=markers.find(m=>m.startIdx===solveStep+1);
+      if(nextStg && nextStg.stage!==currentStg.stage){
+        progText=`🎉 ${currentStg.title} 完成！`;
+        // Trigger confetti on next button click (delayed)
+        if(!window._lblCelebrated){
+          window._lblCelebrated=solveStep;
+          setTimeout(showConfetti,300);
+        }
+      }
+    }else{
+      window._lblCelebrated=null;
+    }
+    // Item 3: Stage 7 panic warning
+    if(currentStg && currentStg.stage===7 && !window._lblScramblePhase){
+      progText=`⚠️ 不要怕！下面會暫時亂掉，堅持做完就會恢復！\n${currentStg.title} — 第 ${solveStep+1} 步`;
     }
   }
-  document.getElementById('sMoveProg').textContent=progText;
+  document.getElementById('sMoveProg').innerHTML=progText.replace(/\n/g,'<br>');
 
   // Step dots
   document.getElementById('sStepDots').innerHTML=
