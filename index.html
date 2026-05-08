@@ -2324,6 +2324,80 @@ function showError(msg){
   document.getElementById('btnRow').innerHTML='<button class="btn" onclick="location.reload()">重新開始</button>';
 }
 
+function showFacePreviews(containerId){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  el.style.display='flex';el.style.gap='4px';el.style.justifyContent='center';el.style.flexWrap='wrap';
+  el.innerHTML=['U','R','F','D','L','B'].map(f=>{
+    const c=faceColors[f]||[];
+    return '<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.4)">'+FLABEL[f]+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:36px">'+c.map(x=>'<div style="width:10px;height:10px;border-radius:2px;background:'+(CMAP[x]||'#333')+'"></div>').join('')+'</div></div>';
+  }).join('');
+}
+
+function showEditableFaces(){
+  const mg=document.getElementById('mgrid');
+  mg.style.display='flex';mg.style.gap='6px';mg.style.justifyContent='center';mg.style.flexWrap='wrap';
+  let html='';
+  const colors=['W','R','B','O','G','Y'];
+  ['U','R','F','D','L','B'].forEach(f=>{
+    html+='<div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.5);margin-bottom:2px">'+FLABEL[f]+'</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">';
+    faceColors[f].forEach((c,i)=>{
+      if(i===4){
+        html+='<div style="width:22px;height:22px;border-radius:3px;background:'+(CMAP[c]||'#333')+';border:2px solid rgba(255,255,255,.3)"></div>';
+      }else{
+        html+='<div style="width:22px;height:22px;border-radius:3px;background:'+(CMAP[c]||'#333')+';cursor:pointer;border:1px solid rgba(255,255,255,.15)" onclick="cycleColor(\''+f+'\','+i+')"></div>';
+      }
+    });
+    html+='</div></div>';
+  });
+  mg.innerHTML=html;
+}
+
+function cycleColor(face,pos){
+  const colors=['W','R','B','O','G','Y'];
+  const cur=faceColors[face][pos];
+  const idx=colors.indexOf(cur);
+  faceColors[face][pos]=colors[(idx+1)%6];
+  showEditableFaces();
+}
+
+function finalizeSolve(){
+  // Rebuild facelet from manually edited faceColors and try to solve
+  const FO=['U','R','F','D','L','B'];
+  let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
+  if(fl.includes('?')){showError('有未知顏色');return;}
+  
+  document.getElementById('info').textContent='驗證中...';
+  document.getElementById('btnRow').innerHTML='';
+  
+  if(solverWorker)solverWorker.terminate();
+  initSolver();
+  
+  let waitCount=0;
+  function waitReady(){
+    waitCount++;
+    if(solverReady){
+      solverCB=(err,sol)=>{
+        if(err){showError('無法解題: '+err.message);return;}
+        if(!sol||!sol.trim()){document.getElementById('doneOv').classList.add('show');return;}
+        solution=sol.trim().split(/\s+/);
+        document.getElementById('info').innerHTML='✅ 驗證成功！';
+        showFacePreviews('mgrid');
+        document.getElementById('btnRow').innerHTML=
+          '<button class="btn" onclick="startSolveMode()">🚀 模式1：最佳解 ('+solution.length+' 步)</button>'+
+          '<button class="btn" style="background:rgba(0,210,255,.9);margin-top:6px" onclick="startLBLMode()">📚 模式2：學習解魔方</button>';
+      };
+      solverWorker.postMessage({t:'solve',fl});
+    }else if(waitCount>100){
+      showError('求解器初始化超時');
+    }else{
+      setTimeout(waitReady,100);
+    }
+  }
+  waitReady();
+}
+
 // ===== GLOBAL CLASSIFY + AUTO-REPAIR =====
 function doClassify(){
   try{ doClassifyInner(); }catch(e){
