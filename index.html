@@ -6,146 +6,95 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>魔方小老師</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:'Nunito',sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden;display:flex;flex-direction:column}
-.cam{position:relative;flex:1;overflow:hidden}
+body{font-family:'Nunito',sans-serif;background:#000;color:#fff;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+.wrap{position:relative;flex:1;overflow:hidden}
 video{width:100%;height:100%;object-fit:cover}
 canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
-canvas#sm{display:none}
 
-/* HUD top */
-.hud{position:absolute;top:0;left:0;right:0;padding:8px 12px;text-align:center;z-index:10;background:linear-gradient(rgba(0,0,0,0.75),transparent);padding-bottom:20px}
-.title{font-size:16px;font-weight:900;color:#FFD700;text-shadow:0 2px 6px rgba(0,0,0,0.9)}
-.inst{font-size:12px;color:#ddd;margin-top:2px;text-shadow:0 1px 3px rgba(0,0,0,0.8)}
-.dots{display:flex;justify-content:center;gap:4px;margin-top:5px}
-.dot{width:18px;height:4px;border-radius:2px;background:rgba(255,255,255,0.2)}
-.dot.done{background:#00D2FF}
-.dot.active{background:#FFD700;width:28px}
+.top-bar{position:absolute;top:0;left:0;right:0;z-index:10;padding:10px 16px;text-align:center;background:linear-gradient(rgba(0,0,0,.8),transparent);padding-bottom:28px}
+.top-title{font-size:18px;font-weight:900;color:#FFD700}
+.top-sub{font-size:12px;color:#ddd;margin-top:2px}
+.top-dots{display:flex;justify-content:center;gap:5px;margin-top:6px}
+.td{width:20px;height:5px;border-radius:3px;background:rgba(255,255,255,.15)}
+.td.done{background:#00D2FF}
+.td.now{background:#FFD700;width:32px}
 
-/* Bottom bar */
-.bot{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:6px 10px 14px;background:linear-gradient(transparent,rgba(0,0,0,0.85));padding-top:20px;text-align:center}
-.status{font-size:13px;color:rgba(255,255,255,0.8);margin-bottom:4px}
-.mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;width:72px;margin:0 auto 4px}
-.mini-cell{height:20px;border-radius:3px;border:1px solid rgba(255,255,255,0.15)}
+.bot-bar{position:absolute;bottom:0;left:0;right:0;z-index:10;padding:8px 16px 20px;background:linear-gradient(transparent,rgba(0,0,0,.9));padding-top:24px;text-align:center}
+.info{font-size:13px;color:rgba(255,255,255,.7);margin-bottom:8px}
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;width:78px;margin:0 auto 8px}
+.mcell{height:22px;border-radius:3px;border:1px solid rgba(255,255,255,.15)}
+.btn{padding:14px 32px;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer;background:#FFD700;color:#000;min-width:120px}
+.btn:active{transform:scale(.96);opacity:.9}
+.btn-sm{padding:10px 20px;font-size:14px}
+.btn-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
-/* Solve mode: move instruction */
-.move-box{display:none;position:absolute;top:0;left:0;right:0;z-index:10;background:rgba(0,0,0,0.8);padding:10px 12px;text-align:center}
-.move-box.show{display:block}
-.move-face{font-size:28px;font-weight:900;color:#FFD700;font-family:'Courier New',monospace}
-.move-desc{font-size:13px;color:#eee;margin-top:2px}
-.move-prog{font-size:11px;color:rgba(255,255,255,0.5);margin-top:3px}
-.move-dots{display:flex;gap:3px;justify-content:center;margin-top:5px;flex-wrap:wrap;max-width:320px;margin-left:auto;margin-right:auto}
-.mv-d{width:14px;height:14px;border-radius:4px;font-size:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);font-family:monospace}
-.mv-d.act{background:#FFD700;color:#000}
-.mv-d.dn{background:rgba(0,210,255,0.3);color:#00D2FF}
+.overlay{display:none;position:absolute;inset:0;z-index:25;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.85)}
+.overlay.show{display:flex}
 
-/* Perspective guide overlay for B/D moves */
-.persp-guide{display:none;position:absolute;bottom:60px;right:10px;z-index:15;width:110px;height:110px;background:rgba(0,0,0,0.7);border-radius:12px;padding:6px}
-.persp-guide.show{display:block}
-.persp-guide canvas{width:100%;height:100%}
+.step-dots{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;max-width:300px;margin:6px auto 0}
+.sd{width:16px;height:16px;border-radius:4px;font-size:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);font-family:monospace;font-weight:700}
+.sd.now{background:#FFD700;color:#000}
+.sd.done{background:rgba(0,210,255,.25);color:#00D2FF}
 
-/* Overlays */
-.ov-screen{display:none;position:absolute;inset:0;z-index:25;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.8)}
-.ov-screen.show{display:flex}
-.ov-icon{font-size:56px;animation:rh 1.5s ease-in-out infinite}
-.ov-txt{font-size:18px;font-weight:800;color:#FFD700;margin-top:8px}
-.ov-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:3px}
-.ov-cd{font-size:42px;font-weight:900;color:#00D2FF;margin-top:12px}
-@keyframes rh{0%,100%{transform:rotate(0deg)}50%{transform:rotate(12deg)}}
-
-.start{position:absolute;inset:0;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;gap:10px}
-.start h1{font-size:24px;font-weight:900;color:#FFD700}
-.start p{color:rgba(255,255,255,0.6);font-size:12px;max-width:260px;text-align:center;line-height:1.5}
-.btn{padding:12px 28px;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer;background:#FFD700;color:#000}
-
-.result{display:none;position:absolute;inset:0;z-index:30;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);padding:16px}
-.result.show{display:flex}
-.result h2{font-size:22px;font-weight:900;color:#FFD700;margin-bottom:6px}
-.result .msg{font-size:14px;margin-bottom:10px;text-align:center}
-.result .faces{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:10px}
-.result .mf{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:48px}
-.result .mf-title{font-size:9px;text-align:center;color:rgba(255,255,255,0.5);margin-bottom:1px}
-.result .mc{width:14px;height:14px;border-radius:2px}
-.result .data{font-size:9px;color:rgba(255,255,255,0.3);word-break:break-all;text-align:center;margin-bottom:10px}
-
-/* Complete screen */
-.complete{display:none;position:absolute;inset:0;z-index:30;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9)}
-.complete.show{display:flex}
-.complete .big{font-size:64px;margin-bottom:10px}
-.complete h2{font-size:24px;font-weight:900;color:#00D2FF}
+.persp{display:none;position:absolute;bottom:80px;right:8px;z-index:12;width:100px;height:100px;background:rgba(0,0,0,.75);border-radius:10px;padding:4px}
+.persp.show{display:block}
+.persp canvas{width:100%;height:100%}
 </style>
 </head>
 <body>
-<div class="cam">
+<div class="wrap">
   <video id="vid" autoplay playsinline muted></video>
   <canvas id="ov"></canvas>
-  <canvas id="sm"></canvas>
 
-  <!-- Scan HUD -->
-  <div class="hud" id="scanHud">
-    <div class="title" id="fl">準備掃描</div>
-    <div class="inst" id="inst">白色朝上，紅色面對鏡頭</div>
-    <div class="dots" id="dots"></div>
-  </div>
-  <div class="bot" id="bot" style="display:none">
-    <div class="status" id="sts">對準框框，保持不動</div>
-    <div class="mini-grid" id="dg" style="display:none"></div>
+  <div class="top-bar" id="topBar">
+    <div class="top-title" id="title">🧊 魔方小老師</div>
+    <div class="top-sub" id="sub"></div>
+    <div class="top-dots" id="dots"></div>
   </div>
 
-  <!-- Solve HUD -->
-  <div class="move-box" id="moveBox">
-    <div class="move-face" id="mFace">-</div>
-    <div class="move-desc" id="mDesc">-</div>
-    <div class="move-prog" id="mProg">-</div>
-    <div class="move-dots" id="mDots"></div>
+  <div class="bot-bar" id="botBar" style="display:none">
+    <div class="info" id="info"></div>
+    <div class="mgrid" id="mgrid" style="display:none"></div>
+    <div class="btn-row" id="btnRow"></div>
   </div>
 
-  <!-- Perspective guide for B/D -->
-  <div class="persp-guide" id="perspGuide">
-    <canvas id="perspCanvas" width="100" height="100"></canvas>
+  <div class="persp" id="persp"><canvas id="perspC" width="92" height="92"></canvas></div>
+
+  <!-- Start -->
+  <div class="overlay show" id="startOv">
+    <div style="font-size:48px;margin-bottom:8px">🧊</div>
+    <div style="font-size:22px;font-weight:900;color:#FFD700">魔方小老師</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px;max-width:260px;text-align:center;line-height:1.5">
+      用相機掃描 6 面 → 自動最佳解 → 一步步教你還原<br>全程白色朝上！
+    </div>
+    <button class="btn" style="margin-top:16px" onclick="startApp()">開始</button>
   </div>
 
-  <!-- Rotate guide overlay -->
-  <div class="ov-screen" id="rotOv">
-    <div class="ov-icon" id="rotIcon">↻</div>
-    <div class="ov-txt" id="rotTxt">-</div>
-    <div class="ov-sub" id="rotSub">-</div>
-    <div class="ov-cd" id="rotCD">3</div>
+  <!-- Solving spinner -->
+  <div class="overlay" id="solveOv">
+    <div style="font-size:40px;animation:spin 1s linear infinite">⚙️</div>
+    <div style="font-size:16px;font-weight:800;color:#FFD700;margin-top:10px">計算最佳解中...</div>
   </div>
-
-  <!-- Solving overlay -->
-  <div class="ov-screen" id="solvingOv">
-    <div class="ov-txt">計算最佳解中...</div>
-    <div class="ov-cd" style="animation:rh 1s linear infinite">⚙</div>
-  </div>
-
-  <!-- Start screen -->
-  <div class="start" id="startScr">
-    <h1>🧊 魔方小老師</h1>
-    <p>用相機掃描 6 面 → 自動計算最佳解 → 一步步引導你還原<br><br>全程保持白色朝上！</p>
-    <button class="btn" onclick="go()">開始掃描</button>
-  </div>
-
-  <!-- Scan result (brief) -->
-  <div class="result" id="resultScr">
-    <h2 id="resTitle">-</h2>
-    <div class="msg" id="resMsg"></div>
-    <div class="faces" id="resFaces"></div>
-    <div class="data" id="resData"></div>
-    <button class="btn" id="resBtn">-</button>
-  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
   <!-- Complete -->
-  <div class="complete" id="completeScr">
-    <div class="big">🎉</div>
-    <h2>魔方還原完成！</h2>
-    <p style="color:rgba(255,255,255,0.6);margin-top:8px;font-size:14px">你太厲害了！</p>
+  <div class="overlay" id="doneOv">
+    <div style="font-size:64px">🎉</div>
+    <div style="font-size:24px;font-weight:900;color:#00D2FF;margin-top:8px">魔方還原完成！</div>
     <button class="btn" style="margin-top:16px" onclick="location.reload()">再來一次</button>
+  </div>
+
+  <!-- Error -->
+  <div class="overlay" id="errOv">
+    <div style="font-size:40px">⚠️</div>
+    <div style="font-size:16px;color:#E94560;margin-top:8px;max-width:280px;text-align:center" id="errMsg"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px" id="errFaces"></div>
+    <button class="btn" style="margin-top:14px" onclick="location.reload()">重新開始</button>
   </div>
 </div>
 
-<!-- Cubejs solver library -->
 <script id="cubejs-src" type="text/plain">
 (function() {
   // Centers
@@ -2191,257 +2140,138 @@ canvas#sm{display:none}
 
 <script>
 // ===== CONSTANTS =====
-const SCAN=[
-  {f:'F',cc:'R',name:'前面（紅）',guide:'白色朝上，紅色對鏡頭'},
-  {f:'R',cc:'B',name:'右面（藍）',rot:'順時針轉 90°',arrow:'↻'},
-  {f:'B',cc:'O',name:'後面（橘）',rot:'再順時針轉 90°',arrow:'↻'},
-  {f:'L',cc:'G',name:'左面（綠）',rot:'再順時針轉 90°',arrow:'↻'},
-  {f:'U',cc:'W',name:'上面（白）',rot:'往後傾，頂面對鏡頭',arrow:'↶'},
-  {f:'D',cc:'Y',name:'下面（黃）',rot:'往前傾，底面對鏡頭',arrow:'↷'},
+const SCAN_SEQ=[
+  {f:'F',name:'前面（紅）',guide:'白色朝上，紅色對鏡頭'},
+  {f:'R',name:'右面（藍）',guide:'順時針轉 90°，藍色對鏡頭'},
+  {f:'B',name:'後面（橘）',guide:'再轉 90°，橘色對鏡頭'},
+  {f:'L',name:'左面（綠）',guide:'再轉 90°，綠色對鏡頭'},
+  {f:'U',name:'上面（白）',guide:'往後傾，白色對鏡頭'},
+  {f:'D',name:'下面（黃）',guide:'往前傾，黃色對鏡頭'},
 ];
 const CMAP={W:'#FFFFFF',R:'#B71234',B:'#0046AD',O:'#FF5800',G:'#009B48',Y:'#FFD500'};
 const CC={F:'R',R:'B',B:'O',L:'G',U:'W',D:'Y'};
 const C2F={W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
-const MOVE_DESC={
-  'U':'上層 ↻ 順時針','U\'':'上層 ↺ 逆時針','U2':'上層轉 180°',
-  'D':'下層 ↻ 順時針','D\'':'下層 ↺ 逆時針','D2':'下層轉 180°',
-  'R':'右層 ↻ 往下推','R\'':'右層 ↺ 往上推','R2':'右層轉 180°',
-  'L':'左層 ↻ 往下推','L\'':'左層 ↺ 往上推','L2':'左層轉 180°',
-  'F':'前層 ↻ 順時針','F\'':'前層 ↺ 逆時針','F2':'前層轉 180°',
-  'B':'後層 ↻ 順時針(從後看)','B\'':'後層 ↺ 逆時針(從後看)','B2':'後層轉 180°',
+const MDESC={
+  'U':'上層 ↻ 順時針',"U'":'上層 ↺ 逆時針','U2':'上層 180°',
+  'D':'下層 ↻ 順時針',"D'":'下層 ↺ 逆時針','D2':'下層 180°',
+  'R':'右層 ↻ 往下推',"R'":'右層 ↺ 往上推','R2':'右層 180°',
+  'L':'左層 ↻ 往下推',"L'":'左層 ↺ 往上推','L2':'左層 180°',
+  'F':'前層 ↻ 順時針',"F'":'前層 ↺ 逆時針','F2':'前層 180°',
+  'B':'後層 ↻ (從後看)',"B'":'後層 ↺ (從後看)','B2':'後層 180°',
 };
 
-// ===== STATE =====
-let vid,ov,octx,sm,sctx;
-let scanning=false, scanIdx=0, prevFrame=null, stillCnt=0;
-let scanIntv=null, rawData={}, faceColors={};
-const STILL_TH=0.05, STILL_N=8;
+let vid, ov, octx;
+let rawData={}, faceColors={}, cubeState={};
+let scanIdx=0, solution=[], solveStep=-1;
+let solverWorker=null, solverCB=null;
+let mode='start'; // start|scan|solve|done
 
-// Solve state
-let solution=[], solveStep=-1;
-let cubeState={}; // internal cube state for verification
-let mode='start'; // start, scan, solve, complete
-let solverWorker=null;
-
-// ===== CAMERA INIT =====
-async function go(){
-  document.getElementById('startScr').style.display='none';
+// ===== APP START =====
+async function startApp(){
+  document.getElementById('startOv').classList.remove('show');
   vid=document.getElementById('vid');
   ov=document.getElementById('ov');
   octx=ov.getContext('2d');
-  sm=document.getElementById('sm');
-  sctx=sm.getContext('2d');
   try{
     const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
     vid.srcObject=s; await vid.play();
     ov.width=vid.videoWidth||720; ov.height=vid.videoHeight||1280;
-    sm.width=64; sm.height=64;
-    mode='scan'; scanIdx=0; mkDots(); startScan();
-    initSolver(); // start loading solver in background
+    initSolver();
+    mode='scan'; scanIdx=0;
+    showScanUI();
   }catch(e){alert('相機錯誤: '+e.message);}
 }
 
-// ===== SOLVER (Web Worker) =====
+// ===== SOLVER =====
 function initSolver(){
-  const libSrc=document.getElementById('cubejs-src').textContent;
-  const code=`${libSrc}\nconst C=self.Cube||(typeof Cube!=='undefined'?Cube:null);\nlet rdy=false;\nself.onmessage=function(e){\nif(e.data.type==='init'){try{C.initSolver();rdy=true;postMessage({type:'ready'})}catch(err){postMessage({type:'error',msg:err.message})}}\nif(e.data.type==='solve'){if(!rdy){C.initSolver();rdy=true;}try{const c=C.fromString(e.data.fl);const s=c.solve();postMessage({type:'solution',sol:s})}catch(err){postMessage({type:'error',msg:err.message})}}\n};`;
-  const blob=new Blob([code],{type:'application/javascript'});
-  solverWorker=new Worker(URL.createObjectURL(blob));
-  solverWorker.onmessage=handleSolverMsg;
-  solverWorker.postMessage({type:'init'});
-}
-let solverCallback=null;
-function handleSolverMsg(e){
-  if(e.data.type==='ready') console.log('Solver ready');
-  if(e.data.type==='solution'&&solverCallback) solverCallback(null,e.data.sol);
-  if(e.data.type==='error'&&solverCallback) solverCallback(new Error(e.data.msg),null);
+  const lib=document.getElementById('cubejs-src').textContent;
+  const code=lib+`\nconst C=self.Cube||(typeof Cube!=='undefined'?Cube:null);let rdy=false;self.onmessage=function(e){if(e.data.t==='init'){try{C.initSolver();rdy=true;postMessage({t:'ok'})}catch(er){postMessage({t:'err',m:er.message})}}if(e.data.t==='solve'){if(!rdy){C.initSolver();rdy=true}try{const c=C.fromString(e.data.fl);postMessage({t:'sol',s:c.solve()})}catch(er){postMessage({t:'err',m:er.message})}}};`;
+  solverWorker=new Worker(URL.createObjectURL(new Blob([code],{type:'application/javascript'})));
+  solverWorker.onmessage=e=>{
+    if(e.data.t==='sol'&&solverCB)solverCB(null,e.data.s);
+    if(e.data.t==='err'&&solverCB)solverCB(new Error(e.data.m));
+  };
+  solverWorker.postMessage({t:'init'});
 }
 
 // ===== SCAN PHASE =====
-function mkDots(){
-  document.getElementById('dots').innerHTML=SCAN.map((_,i)=>
-    `<div class="dot${i<scanIdx?' done':''}${i===scanIdx?' active':''}" id="d${i}"></div>`).join('');
-}
-// ===== CUBE DETECTION =====
-// Check if a Rubik's cube is present inside the guide frame
-// Uses: (1) color variance across 9 cells, (2) saturation count (cube has vivid colors)
-function detectCubeInFrame(){
-  if(!vid.videoWidth) return false;
-  const vw=vid.videoWidth, vh=vid.videoHeight;
-  const tc=document.createElement('canvas');tc.width=vw;tc.height=vh;
-  const tctx=tc.getContext('2d');tctx.drawImage(vid,0,0,vw,vh);
-  const gs=Math.min(vw,vh)*0.55, cs=gs/3;
-  const sx=(vw-gs)/2, sy=(vh-gs)/2;
-
-  // Sample 9 cell centers
-  let rgbs=[];
-  for(let r=0;r<3;r++) for(let c=0;c<3;c++){
-    const px=Math.round(sx+(c+0.5)*cs), py=Math.round(sy+(r+0.5)*cs);
-    const d=tctx.getImageData(px-2,py-2,5,5);
-    let rr=0,gg=0,bb=0;
-    for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
-    const n=d.data.length/4;
-    rgbs.push([rr/n, gg/n, bb/n]);
-  }
-
-  // Signal 1: Color variance — cube has many colors, background is uniform
-  const avgR=rgbs.reduce((s,c)=>s+c[0],0)/9;
-  const avgG=rgbs.reduce((s,c)=>s+c[1],0)/9;
-  const avgB=rgbs.reduce((s,c)=>s+c[2],0)/9;
-  let variance=0;
-  rgbs.forEach(([r,g,b])=>{
-    variance+=((r-avgR)**2+(g-avgG)**2+(b-avgB)**2);
-  });
-  variance/=9;
-
-  // Signal 2: Saturation count AND distinct hue count
-  // Cube has vivid colors in multiple hues (R,G,B,O,Y)
-  // Wood desk may have high saturation but only one hue (brown)
-  let highSatCount=0;
-  const hueBuckets=new Set();
-  rgbs.forEach(([r,g,b])=>{
-    const mx=Math.max(r,g,b), mn=Math.min(r,g,b);
-    const sat=(mx>10)?(mx-mn)/mx:0;
-    if(sat>0.3){
-      highSatCount++;
-      // Compute hue bucket (50° per bucket)
-      const rf=r/255,gf=g/255,bf=b/255;
-      const d=mx/255-mn/255;
-      let h=0;
-      if(d>0.01){
-        if(mx===r) h=60*(((gf-bf)/d+6)%6);
-        else if(mx===g) h=60*((bf-rf)/d+2);
-        else h=60*((rf-gf)/d+4);
-      }
-      hueBuckets.add(Math.floor(h/50));
-    }
-  });
-
-  // Cube detected if ALL three conditions met:
-  // 1. High color variance (different brightnesses/colors across cells)
-  // 2. At least 3 cells have vivid color (not gray/white)
-  // 3. At least 3 distinct hue families (not just one color like brown wood)
-  const hasCube = variance > 1000 && highSatCount >= 3 && hueBuckets.size >= 3;
-
-  return hasCube;
+function showScanUI(){
+  const info=SCAN_SEQ[scanIdx];
+  document.getElementById('title').textContent=info.name;
+  document.getElementById('sub').textContent=info.guide;
+  document.getElementById('dots').innerHTML=SCAN_SEQ.map((_,i)=>
+    `<div class="td${i<scanIdx?' done':''}${i===scanIdx?' now':''}"></div>`).join('');
+  document.getElementById('botBar').style.display='block';
+  document.getElementById('info').textContent='對準框框後按下拍照';
+  document.getElementById('mgrid').style.display='none';
+  document.getElementById('btnRow').innerHTML='<button class="btn" onclick="doScanCapture()">📸 拍照</button>';
+  drawGuideGrid();
 }
 
-function startScan(){
-  const info=SCAN[scanIdx];
-  document.getElementById('fl').textContent=info.name;
-  document.getElementById('inst').textContent=info.guide||'對準框框，保持不動';
-  document.getElementById('bot').style.display='block';
-  document.getElementById('dg').style.display='none';
-  document.getElementById('sts').textContent='把魔方放進框框';
-  document.getElementById('scanHud').style.display='block';
-  mkDots();
-  scanning=true; prevFrame=null; stillCnt=0;
-  if(scanIntv)clearInterval(scanIntv);
-  scanIntv=setInterval(scanTick,200);
-}
-function scanTick(){
-  if(!scanning||!vid.videoWidth)return;
-
-  // Step 0: Check if cube is in frame
-  if(!detectCubeInFrame()){
-    stillCnt=0;
-    document.getElementById('sts').textContent='🔲 把魔方放進框框';
-    prevFrame=null; // reset so motion detection restarts when cube appears
-    drawScanOv();
-    return;
-  }
-
-  // Step 1: Motion detection
-  sctx.drawImage(vid,0,0,64,64);
-  const fr=sctx.getImageData(0,0,64,64);
-  if(prevFrame){
-    let diff=0;const tot=fr.data.length/4;
-    for(let i=0;i<fr.data.length;i+=4){
-      const d=(Math.abs(fr.data[i]-prevFrame.data[i])+Math.abs(fr.data[i+1]-prevFrame.data[i+1])+Math.abs(fr.data[i+2]-prevFrame.data[i+2]))/3;
-      if(d>18)diff++;
-    }
-    if(diff/tot<STILL_TH){
-      stillCnt++;
-      document.getElementById('sts').textContent=`🧊 靜止中 ${'●'.repeat(stillCnt)}${'○'.repeat(Math.max(0,STILL_N-stillCnt))}`;
-      if(stillCnt>=STILL_N){scanCapture();return;}
-    }else{
-      stillCnt=0;
-      document.getElementById('sts').textContent='🧊 偵測到魔方，保持不動';
-    }
-  }
-  prevFrame=fr;
-  drawScanOv();
-}
-function drawScanOv(){
+function drawGuideGrid(){
+  if(!ov.width)return;
   const vw=ov.width,vh=ov.height;
   octx.clearRect(0,0,vw,vh);
   const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
-  octx.fillStyle='rgba(0,0,0,0.25)';
+  octx.fillStyle='rgba(0,0,0,.25)';
   octx.fillRect(0,0,vw,sy);octx.fillRect(0,sy+gs,vw,vh-sy-gs);
   octx.fillRect(0,sy,sx,gs);octx.fillRect(sx+gs,sy,vw-sx-gs,gs);
-  octx.strokeStyle='rgba(255,215,0,0.5)';octx.lineWidth=1.5;
+  octx.strokeStyle='rgba(255,215,0,.5)';octx.lineWidth=1.5;
   for(let i=0;i<=3;i++){
     octx.beginPath();octx.moveTo(sx+i*cs,sy);octx.lineTo(sx+i*cs,sy+gs);octx.stroke();
     octx.beginPath();octx.moveTo(sx,sy+i*cs);octx.lineTo(sx+gs,sy+i*cs);octx.stroke();
   }
   octx.strokeStyle='#FFD700';octx.lineWidth=3;
-  const mk=14;
+  const m=14;
   [[sx,sy],[sx+gs,sy],[sx,sy+gs],[sx+gs,sy+gs]].forEach(([x,y])=>{
     const dx=x===sx?1:-1,dy=y===sy?1:-1;
-    octx.beginPath();octx.moveTo(x+mk*dx,y);octx.lineTo(x,y);octx.lineTo(x,y+mk*dy);octx.stroke();
+    octx.beginPath();octx.moveTo(x+m*dx,y);octx.lineTo(x,y);octx.lineTo(x,y+m*dy);octx.stroke();
   });
-  if(stillCnt>0){
-    const ccx=sx+gs/2,ccy=sy+gs/2;
-    octx.strokeStyle='#00D2FF';octx.lineWidth=3;
-    octx.beginPath();octx.arc(ccx,ccy,gs/2+12,-Math.PI/2,-Math.PI/2+(stillCnt/STILL_N)*Math.PI*2);octx.stroke();
-  }
 }
-function scanCapture(){
-  scanning=false;if(scanIntv)clearInterval(scanIntv);
-  if(navigator.vibrate)navigator.vibrate(100);
+
+function doScanCapture(){
+  if(!vid.videoWidth)return;
   const vw=vid.videoWidth,vh=vid.videoHeight;
   const tc=document.createElement('canvas');tc.width=vw;tc.height=vh;
   const tctx=tc.getContext('2d');tctx.drawImage(vid,0,0,vw,vh);
   const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
-  const info=SCAN[scanIdx];
+
   let rgbs=[];
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){
-    const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
+    const px=Math.round(sx+(c+.5)*cs),py=Math.round(sy+(r+.5)*cs);
     const d=tctx.getImageData(px-5,py-5,11,11);
     let rr=0,gg=0,bb=0;
     for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
     const n=d.data.length/4;
     rgbs.push([Math.round(rr/n),Math.round(gg/n),Math.round(bb/n)]);
   }
-  rawData[info.f]=rgbs;
-  const dg=document.getElementById('dg');dg.style.display='grid';
-  dg.innerHTML=rgbs.map(([r,g,b],i)=>`<div class="mini-cell" style="background:rgb(${r},${g},${b})">${i===4?'⭐':''}</div>`).join('');
-  document.getElementById('sts').textContent=`✅ ${info.name} 已拍攝 (${scanIdx+1}/6)`;
-  setTimeout(()=>{try{
-    scanIdx++;
-    if(scanIdx>=SCAN.length)globalClassify();
-    else showRotate();
-  }catch(e){document.getElementById('sts').textContent='錯誤:'+e.message;console.error(e);}},800);
-}
-function showRotate(){
-  const info=SCAN[scanIdx];
-  document.getElementById('rotOv').classList.add('show');
-  document.getElementById('rotIcon').textContent=info.arrow||'↻';
-  document.getElementById('rotTxt').textContent=info.rot;
-  document.getElementById('rotSub').textContent=`下一面：${info.name}`;
-  let cd=3;document.getElementById('rotCD').textContent=cd;
-  const ci=setInterval(()=>{cd--;if(cd<=0){clearInterval(ci);document.getElementById('rotOv').classList.remove('show');startScan();}else document.getElementById('rotCD').textContent=cd;},1000);
+  rawData[SCAN_SEQ[scanIdx].f]=rgbs;
+  if(navigator.vibrate)navigator.vibrate(80);
+
+  // Show preview
+  const mg=document.getElementById('mgrid');mg.style.display='grid';
+  mg.innerHTML=rgbs.map(([r,g,b],i)=>`<div class="mcell" style="background:rgb(${r},${g},${b})">${i===4?'⭐':''}</div>`).join('');
+  document.getElementById('info').textContent=`✅ ${SCAN_SEQ[scanIdx].name} 已拍攝`;
+
+  // Next or classify
+  scanIdx++;
+  if(scanIdx>=SCAN_SEQ.length){
+    document.getElementById('btnRow').innerHTML='<button class="btn" onclick="doClassify()">🔍 分析顏色</button>';
+  }else{
+    document.getElementById('btnRow').innerHTML=`<button class="btn" onclick="showScanUI()">下一面 → ${SCAN_SEQ[scanIdx].name}</button>`;
+  }
 }
 
-// ===== GLOBAL CLASSIFICATION =====
-function globalClassify(){
-  document.getElementById('sts').textContent='分析 54 色塊中...';
+// ===== GLOBAL CLASSIFY =====
+function doClassify(){
   const FO=['U','R','F','D','L','B'];
   const all=[];
-  FO.forEach(f=>{const rgbs=rawData[f];if(!rgbs)return;for(let i=0;i<9;i++)all.push({face:f,pos:i,rgb:rgbs[i],color:null});});
-  if(all.length!==54){showScanResult(false,'只有'+all.length+'個色塊');return;}
+  FO.forEach(f=>{const r=rawData[f];if(!r)return;for(let i=0;i<9;i++)all.push({face:f,pos:i,rgb:r[i],color:null});});
+  if(all.length!==54){showError('只有 '+all.length+' 個色塊');return;}
+
   const anchors={};FO.forEach(f=>{anchors[CC[f]]=rawData[f][4];});
   all.forEach(s=>{if(s.pos===4)s.color=CC[s.face];});
+
   const nonC=all.filter(s=>s.pos!==4);
   nonC.forEach(s=>{s.dists={};Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{const[r,g,b]=s.rgb;s.dists[c]=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);});});
   const cnt={W:1,R:1,B:1,O:1,G:1,Y:1};
@@ -2449,461 +2279,234 @@ function globalClassify(){
   cands.sort((a,b)=>a.d-b.d);
   cands.forEach(({s,c})=>{if(s.color||cnt[c]>=9)return;s.color=c;cnt[c]++;});
   nonC.filter(s=>!s.color).forEach(s=>{const a=Object.entries(cnt).find(([c,n])=>n<9);if(a){s.color=a[0];cnt[a[0]]++;}});
+
   FO.forEach(f=>{faceColors[f]=all.filter(s=>s.face===f).sort((a,b)=>a.pos-b.pos).map(s=>s.color);});
-  // Build facelet
+
   let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
   const fcnt={};for(const ch of fl)fcnt[ch]=(fcnt[ch]||0)+1;
   const ok=!fl.includes('?')&&Object.values(fcnt).every(v=>v===9);
-  if(!ok){showScanResult(false,JSON.stringify(fcnt));return;}
-  // Solve!
-  startSolving(fl);
+  if(!ok){showError('顏色數量不對: '+JSON.stringify(fcnt));return;}
+
+  // Show result briefly then solve
+  document.getElementById('info').textContent='顏色分析完成 ✅';
+  showFacePreviews('mgrid');
+  document.getElementById('btnRow').innerHTML=`<button class="btn" onclick="doSolve('${fl}')">🚀 開始解題</button>`;
 }
 
-function showScanResult(ok,detail){
-  document.getElementById('bot').style.display='none';
-  document.getElementById('scanHud').style.display='none';
-  const rs=document.getElementById('resultScr');rs.classList.add('show');
-  document.getElementById('resTitle').textContent='⚠️ 掃描問題';
-  document.getElementById('resMsg').innerHTML=`<span style="color:#E94560">${detail||'未知錯誤'}</span>`;
-  document.getElementById('resBtn').textContent='重新開始';
-  document.getElementById('resBtn').onclick=()=>location.reload();
-  // Show face previews
-  const fp=document.getElementById('resFaces');fp.innerHTML='';
+function showFacePreviews(targetId){
+  const el=document.getElementById(targetId);
+  el.style.display='flex';el.style.gap='4px';el.style.justifyContent='center';el.style.width='auto';
+  el.style.gridTemplateColumns='';
+  el.innerHTML=['U','R','F','D','L','B'].map(f=>{
+    const c=faceColors[f];if(!c)return'';
+    return `<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.4)">${f}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:36px">${c.map(x=>`<div style="width:10px;height:10px;border-radius:2px;background:${CMAP[x]||'#333'}"></div>`).join('')}</div></div>`;
+  }).join('');
+}
+
+function showError(msg){
+  const eo=document.getElementById('errOv');eo.classList.add('show');
+  document.getElementById('errMsg').textContent=msg;
+  const ef=document.getElementById('errFaces');ef.innerHTML='';
   ['U','R','F','D','L','B'].forEach(f=>{
     const c=faceColors[f];if(!c)return;
     const d=document.createElement('div');
-    d.innerHTML=`<div class="mf-title">${f}</div><div class="mf">${c.map(x=>`<div class="mc" style="background:${CMAP[x]||'#333'}"></div>`).join('')}</div>`;
-    fp.appendChild(d);
+    d.innerHTML=`<div style="font-size:8px;color:rgba(255,255,255,.4)">${f}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">${c.map(x=>`<div style="width:12px;height:12px;border-radius:2px;background:${CMAP[x]||'#333'}"></div>`).join('')}</div>`;
+    ef.appendChild(d);
   });
 }
 
-// ===== SOLVE PHASE =====
-function startSolving(fl){
-  document.getElementById('bot').style.display='none';
-  document.getElementById('scanHud').style.display='none';
-  document.getElementById('solvingOv').classList.add('show');
-  solverCallback=(err,sol)=>{
-    document.getElementById('solvingOv').classList.remove('show');
-    if(err){showScanResult(false,'無法解題: '+err.message);return;}
-    if(!sol||!sol.trim()){document.getElementById('completeScr').classList.add('show');return;}
+// ===== SOLVE =====
+function doSolve(fl){
+  document.getElementById('botBar').style.display='none';
+  document.getElementById('solveOv').classList.add('show');
+  solverCB=(err,sol)=>{
+    document.getElementById('solveOv').classList.remove('show');
+    if(err){showError('解題失敗: '+err.message);return;}
+    if(!sol||!sol.trim()){document.getElementById('doneOv').classList.add('show');return;}
     solution=sol.trim().split(/\s+/);
     solveStep=-1;
-    // Init internal cube state = the scanned colors
     ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
     mode='solve';
-    showSolveUI();
+    showSolveStep();
   };
-  solverWorker.postMessage({type:'solve',fl:fl});
+  solverWorker.postMessage({t:'solve',fl});
 }
 
-function showSolveUI(){
-  document.getElementById('moveBox').classList.add('show');
-  // Build step dots
-  const dotsEl=document.getElementById('mDots');
-  dotsEl.innerHTML=solution.map((m,i)=>`<div class="mv-d" id="sd${i}">${m}</div>`).join('');
+// ===== SOLVE STEP-BY-STEP =====
+function showSolveStep(){
+  document.getElementById('botBar').style.display='block';
+  document.getElementById('persp').classList.remove('show');
+
   if(solveStep===-1){
-    // Show initial state - tell user to put cube back facing camera
-    document.getElementById('mFace').textContent='🔍';
-    document.getElementById('mDesc').textContent='把魔方放回鏡頭前（紅色面對鏡頭）';
-    document.getElementById('mProg').textContent=`共 ${solution.length} 步`;
-    document.getElementById('bot').style.display='block';
-    document.getElementById('sts').textContent='對準後靜止 → 開始第 1 步';
-    document.getElementById('dg').style.display='none';
-    // Wait for still detection to confirm initial position (verify F face matches scan)
-    startVerifyWithColor(()=>{nextSolveStep();}, cubeState['F']);
-  }
-}
-
-function nextSolveStep(){
-  solveStep++;
-  if(solveStep>=solution.length){
-    document.getElementById('moveBox').classList.remove('show');
-    document.getElementById('bot').style.display='none';
-    document.getElementById('perspGuide').classList.remove('show');
-    document.getElementById('completeScr').classList.add('show');
+    // Initial: show "ready?"
+    document.getElementById('title').textContent='🧊 準備好了嗎？';
+    document.getElementById('sub').textContent='白色朝上，紅色面對鏡頭';
+    document.getElementById('dots').innerHTML='';
+    document.getElementById('info').textContent=`共 ${solution.length} 步`;
+    showExpected();
+    buildStepDots();
+    document.getElementById('btnRow').innerHTML='<button class="btn" onclick="nextMove()">開始第 1 步 →</button>';
+    drawGuideGrid();
     return;
   }
+
+  if(solveStep>=solution.length){
+    document.getElementById('doneOv').classList.add('show');
+    return;
+  }
+
   const mv=solution[solveStep];
   const face=mv[0];
-  
-  // Capture F face BEFORE this move (for B-move verification)
-  const fFaceBefore=[...cubeState['F']];
-  
-  // Update internal cube state
-  applyMoveToCubeState(mv);
-  
-  // The expected F face AFTER this move
-  const fFaceAfter=[...cubeState['F']];
-  
-  // Update UI
-  document.getElementById('mFace').textContent=mv;
-  document.getElementById('mDesc').textContent=MOVE_DESC[mv]||mv;
-  document.getElementById('mProg').textContent=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
-  // Update dots
-  solution.forEach((_,i)=>{
-    const d=document.getElementById('sd'+i);
-    if(!d)return;
-    d.className='mv-d'+(i===solveStep?' act':'')+(i<solveStep?' dn':'');
-  });
-  // Draw move guide on overlay
-  drawMoveGuide(mv);
-  // Show perspective guide for B/D
+
+  document.getElementById('title').textContent=mv;
+  document.getElementById('sub').textContent=MDESC[mv]||mv;
+  document.getElementById('info').textContent=`第 ${solveStep+1} 步 / 共 ${solution.length} 步`;
+
+  showExpected();
+  buildStepDots();
+  drawMoveOverlay(mv);
+
+  // Perspective guide for B/D
   if(face==='B'||face==='D'){
-    document.getElementById('perspGuide').classList.add('show');
-    drawPerspGuide(mv);
-  }else{
-    document.getElementById('perspGuide').classList.remove('show');
+    document.getElementById('persp').classList.add('show');
+    drawPersp(mv);
   }
-  // Show expected F face after this move
-  showExpectedFace();
-  // Start verification — ALL 6 faces use camera verification
-  document.getElementById('sts').textContent='轉完後放回框框，保持不動';
-  if(face==='B'){
-    // B: F face must stay UNCHANGED (verify == fFaceBefore)
-    startVerifyWithColor(()=>{ nextSolveStep(); }, fFaceBefore);
-  }else{
-    // F/U/D/R/L: F face must match fFaceAfter
-    startVerifyWithColor(()=>{ nextSolveStep(); }, fFaceAfter);
-  }
+
+  document.getElementById('btnRow').innerHTML=
+    `<button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff" onclick="prevMove()">← 上一步</button>`+
+    `<button class="btn" onclick="nextMove()">${solveStep>=solution.length-1?'🎉 完成！':'下一步 →'}</button>`;
 }
 
-// ===== EXPECTED F FACE =====
-function showExpectedFace(){
+function nextMove(){
+  solveStep++;
+  if(solveStep>0 && solveStep<=solution.length){
+    // Apply the move we just completed
+    applyMove(solution[solveStep-1]);
+  }
+  showSolveStep();
+}
+
+function prevMove(){
+  if(solveStep<=0)return;
+  // Undo current step
+  undoMoveOnState(solution[solveStep-1]);
+  solveStep--;
+  showSolveStep();
+}
+
+function showExpected(){
+  const mg=document.getElementById('mgrid');mg.style.display='grid';
+  mg.style.width='78px';mg.style.gridTemplateColumns='repeat(3,1fr)';
   const expected=cubeState['F'];
-  const dg=document.getElementById('dg');dg.style.display='grid';
-  dg.innerHTML=expected.map(c=>`<div class="mini-cell" style="background:${CMAP[c]||'#333'}"></div>`).join('');
+  mg.innerHTML=expected.map(c=>`<div class="mcell" style="background:${CMAP[c]||'#333'}"></div>`).join('');
 }
 
-// ===== COLOR VERIFICATION (all faces) =====
-let verifyCallback=null;
-let verifyIntv=null;
-let verifyExpected=null; // the 9 colors we expect to see on F face
-let retryCount=0;
-
-function startVerifyWithColor(cb, expectedColors){
-  verifyCallback=cb;
-  verifyExpected=expectedColors;
-  retryCount=0;
-  stillCnt=0;prevFrame=null;scanning=true;
-  if(verifyIntv)clearInterval(verifyIntv);
-  verifyIntv=setInterval(verifyTickColor,200);
+function buildStepDots(){
+  document.getElementById('dots').innerHTML=
+    `<div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:300px">`+
+    solution.map((m,i)=>`<div class="sd${i===solveStep?' now':''}${i<solveStep?' done':''}">${m.replace("'","'")}</div>`).join('')+
+    `</div>`;
 }
 
-function verifyTickColor(){
-  if(!scanning||!vid.videoWidth)return;
-
-  // Step 0: Check if cube is in frame
-  if(!detectCubeInFrame()){
-    stillCnt=0;
-    document.getElementById('sts').textContent='🔲 把魔方放回框框';
-    prevFrame=null;
-    if(mode==='solve'&&solveStep>=0) drawSolveOv();
-    else drawScanOv();
-    return;
-  }
-
-  // Step 1: Motion detection
-  sctx.drawImage(vid,0,0,64,64);
-  const fr=sctx.getImageData(0,0,64,64);
-  if(prevFrame){
-    let diff=0;const tot=fr.data.length/4;
-    for(let i=0;i<fr.data.length;i+=4){
-      const d=(Math.abs(fr.data[i]-prevFrame.data[i])+Math.abs(fr.data[i+1]-prevFrame.data[i+1])+Math.abs(fr.data[i+2]-prevFrame.data[i+2]))/3;
-      if(d>18)diff++;
-    }
-    if(diff/tot<STILL_TH){
-      stillCnt++;
-      document.getElementById('sts').textContent=`🧊 靜止中 ${'●'.repeat(Math.min(stillCnt,STILL_N))}${'○'.repeat(Math.max(0,STILL_N-stillCnt))}`;
-      if(stillCnt>=STILL_N){
-        scanning=false;clearInterval(verifyIntv);
-        if(navigator.vibrate)navigator.vibrate(50);
-        verifyFaceColors();
-        return;
-      }
-    }else{
-      stillCnt=0;
-      document.getElementById('sts').textContent='🧊 偵測到魔方，保持不動';
-    }
-  }
-  prevFrame=fr;
-  if(mode==='solve'&&solveStep>=0) drawSolveOv();
-  else drawScanOv();
-}
-
-function verifyFaceColors(){
-  // Sample 9 RGB values from camera
-  const vw=vid.videoWidth,vh=vid.videoHeight;
-  const tc=document.createElement('canvas');tc.width=vw;tc.height=vh;
-  const tctx=tc.getContext('2d');tctx.drawImage(vid,0,0,vw,vh);
-  const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
-
-  let capturedRGBs=[];
-  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
-    const px=Math.round(sx+(c+0.5)*cs),py=Math.round(sy+(r+0.5)*cs);
-    const d=tctx.getImageData(px-5,py-5,11,11);
-    let rr=0,gg=0,bb=0;
-    for(let i=0;i<d.data.length;i+=4){rr+=d.data[i];gg+=d.data[i+1];bb+=d.data[i+2];}
-    const n=d.data.length/4;
-    capturedRGBs.push([Math.round(rr/n),Math.round(gg/n),Math.round(bb/n)]);
-  }
-
-  // Classify captured colors using scan-phase anchors
-  const anchors={};
-  ['U','R','F','D','L','B'].forEach(f=>{
-    if(rawData[f])anchors[CC[f]]=rawData[f][4];
-  });
-
-  let capturedColors=capturedRGBs.map(([r,g,b])=>{
-    let best=null,bd=Infinity;
-    Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{
-      const dist=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);
-      if(dist<bd){bd=dist;best=c;}
-    });
-    return best||'?';
-  });
-
-  // Compare with expected F face (passed via verifyExpected)
-  const expected=verifyExpected;
-  let matchCount=0;
-  for(let i=0;i<9;i++){
-    if(capturedColors[i]===expected[i]) matchCount++;
-  }
-
-  // Show comparison in mini grid
-  const dg=document.getElementById('dg');dg.style.display='grid';
-  dg.innerHTML=capturedColors.map((c,i)=>{
-    const ok=c===expected[i];
-    const border=ok?'2px solid #00D2FF':'2px solid #E94560';
-    return `<div class="mini-cell" style="background:${CMAP[c]||'#333'};border:${border}"></div>`;
-  }).join('');
-
-  if(matchCount>=7){
-    // Good enough (allow 2 mismatches for lighting tolerance)
-    document.getElementById('sts').textContent=`✅ 驗證通過 (${matchCount}/9)`;
-    if(navigator.vibrate)navigator.vibrate([50,50,50]);
-    setTimeout(()=>{if(verifyCallback)verifyCallback();},600);
-  }else{
-    retryCount++;
-    if(retryCount>=3){
-      // After 3 retries, let them pass anyway (avoid infinite loop)
-      document.getElementById('sts').textContent=`⚠️ 跳過驗證，繼續下一步`;
-      if(navigator.vibrate)navigator.vibrate(200);
-      setTimeout(()=>{if(verifyCallback)verifyCallback();},1000);
-    }else{
-      // Mismatch — ask to retry
-      document.getElementById('sts').textContent=`❌ 好像不對 (${matchCount}/9)，請確認後再靜止`;
-      if(navigator.vibrate)navigator.vibrate([100,100,100,100,100]);
-      // Restart still detection for another attempt
-      setTimeout(()=>{
-        stillCnt=0;prevFrame=null;scanning=true;
-        if(verifyIntv)clearInterval(verifyIntv);
-        verifyIntv=setInterval(verifyTickColor,200);
-      },1500);
-    }
-  }
-}
-
-// ===== DRAW MOVE GUIDE ON CAMERA OVERLAY =====
-function drawMoveGuide(mv){
-  // This is called once when the step starts.
-  // The actual overlay is drawn continuously in drawSolveOv()
-}
-function drawSolveOv(){
+// ===== DRAW MOVE OVERLAY =====
+function drawMoveOverlay(mv){
+  if(!ov.width)return;
   const vw=ov.width,vh=ov.height;
   octx.clearRect(0,0,vw,vh);
   const gs=Math.min(vw,vh)*0.55,cs=gs/3,sx=(vw-gs)/2,sy=(vh-gs)/2;
-  // Dim outside
-  octx.fillStyle='rgba(0,0,0,0.2)';
-  octx.fillRect(0,0,vw,sy);octx.fillRect(0,sy+gs,vw,vh-sy-gs);
-  octx.fillRect(0,sy,sx,gs);octx.fillRect(sx+gs,sy,vw-sx-gs,gs);
-  // Grid
-  octx.strokeStyle='rgba(255,215,0,0.3)';octx.lineWidth=1;
+
+  // Light grid
+  octx.strokeStyle='rgba(255,215,0,.3)';octx.lineWidth=1;
   for(let i=0;i<=3;i++){
     octx.beginPath();octx.moveTo(sx+i*cs,sy);octx.lineTo(sx+i*cs,sy+gs);octx.stroke();
     octx.beginPath();octx.moveTo(sx,sy+i*cs);octx.lineTo(sx+gs,sy+i*cs);octx.stroke();
   }
-  if(solveStep<0||solveStep>=solution.length)return;
-  const mv=solution[solveStep];
-  const face=mv[0], prime=mv.includes("'"), dbl=mv.includes('2');
-  // Draw arrows on the camera overlay showing which part to turn
-  // The camera sees the F face. We draw arrows on the relevant edges.
-  octx.strokeStyle='#FFD700';octx.lineWidth=3;octx.lineCap='round';
-  const arrowColor='#FFD700';
-  switch(face){
-    case 'F':drawFaceArrow(sx,sy,gs,prime,dbl);break;
-    case 'U':drawTopArrow(sx,sy,gs,cs,prime,dbl);break;
-    case 'D':drawBottomArrow(sx,sy,gs,cs,prime,dbl);break;
-    case 'R':drawRightArrow(sx,sy,gs,cs,prime,dbl);break;
-    case 'L':drawLeftArrow(sx,sy,gs,cs,prime,dbl);break;
-    case 'B':drawBackArrow(sx,sy,gs,cs,prime,dbl);break;
-  }
-  // Still ring
-  if(stillCnt>0){
-    octx.strokeStyle='#00D2FF';octx.lineWidth=3;
-    octx.beginPath();octx.arc(sx+gs/2,sy+gs/2,gs/2+12,-Math.PI/2,-Math.PI/2+(stillCnt/STILL_N)*Math.PI*2);octx.stroke();
-  }
-}
 
-// Arrow drawing helpers
-function drawFaceArrow(sx,sy,gs,prime,dbl){
-  // Full face rotation arrow around the 3x3 grid
-  const cx=sx+gs/2,cy=sy+gs/2,r=gs*0.42;
-  const dir=prime?-1:1;
-  const total=dbl?Math.PI*1.5:Math.PI*0.85;
-  const start=-total/2;
-  octx.beginPath();
-  for(let i=0;i<=20;i++){
-    const a=start+(total*i/20)*dir;
-    const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
-    i===0?octx.moveTo(px,py):octx.lineTo(px,py);
+  const face=mv[0],prime=mv.includes("'"),dbl=mv.includes('2');
+  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.lineCap='round';octx.fillStyle='#FFD700';
+  octx.font='bold 16px Nunito';octx.textAlign='center';
+
+  switch(face){
+    case 'F': drawArc(sx+gs/2,sy+gs/2,gs*.4,prime,dbl); octx.fillText('F 前層',sx+gs/2,sy-10); break;
+    case 'U': drawHArrow(sx,sy-10,gs,prime); hl(sx,sy,gs,cs,true); octx.fillText('U 上層',sx+gs/2,sy-20); break;
+    case 'D': drawHArrow(sx,sy+gs+10,gs,!prime); hl(sx,sy+gs-cs,gs,cs,true); octx.fillText('D 下層',sx+gs/2,sy+gs+30); break;
+    case 'R': drawVArrow(sx+gs+10,sy,gs,prime); hl(sx+gs-cs,sy,cs,gs,false); octx.fillText('R',sx+gs+24,sy+gs/2+5); break;
+    case 'L': drawVArrow(sx-10,sy,gs,!prime); hl(sx,sy,cs,gs,false); octx.fillText('L',sx-24,sy+gs/2+5); break;
+    case 'B':
+      octx.setLineDash([6,4]);octx.strokeStyle='rgba(255,215,0,.4)';octx.lineWidth=2;
+      octx.strokeRect(sx-3,sy-3,gs+6,gs+6);octx.setLineDash([]);
+      octx.fillStyle='#FFD700';octx.fillText('B 後層（見右下圖）',sx+gs/2,sy-10);
+      break;
   }
-  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
-  // Arrowhead
-  const ea=start+total*dir;
-  const tx=cx+Math.cos(ea)*r,ty=cy+Math.sin(ea)*r;
-  const pa=start+total*0.85*dir;
-  const px=cx+Math.cos(pa)*r,py=cy+Math.sin(pa)*r;
-  drawArrowHead(tx,ty,tx-px,ty-py);
 }
-function drawTopArrow(sx,sy,gs,cs,prime,dbl){
-  // U layer = top row of F face. Draw horizontal arrow above the grid
-  const y=sy-8;const x1=sx+cs*0.5,x2=sx+gs-cs*0.5;
+function drawArc(cx,cy,r,prime,dbl){
+  const dir=prime?-1:1,total=dbl?Math.PI*1.4:Math.PI*.85,start=-total/2;
   octx.beginPath();
-  if(prime){octx.moveTo(x2,y);octx.lineTo(x1,y);drawArrowHead(x1,y,-1,0);}
-  else{octx.moveTo(x1,y);octx.lineTo(x2,y);drawArrowHead(x2,y,1,0);}
-  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
-  // Highlight top row
-  octx.fillStyle='rgba(255,215,0,0.15)';octx.fillRect(sx,sy,gs,cs);
-  // Label
-  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
-  octx.fillText('U 上層',sx+gs/2,sy-16);
+  for(let i=0;i<=20;i++){const a=start+(total*i/20)*dir;const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;i?octx.lineTo(px,py):octx.moveTo(px,py);}
+  octx.stroke();
+  const ea=start+total*dir,tx=cx+Math.cos(ea)*r,ty=cy+Math.sin(ea)*r;
+  const pa=start+total*.85*dir,ppx=cx+Math.cos(pa)*r,ppy=cy+Math.sin(pa)*r;
+  arrowHead(tx,ty,tx-ppx,ty-ppy);
 }
-function drawBottomArrow(sx,sy,gs,cs,prime,dbl){
-  const y=sy+gs+8;const x1=sx+cs*0.5,x2=sx+gs-cs*0.5;
+function drawHArrow(x,y,w,right){
+  const x1=x+w*.15,x2=x+w*.85;
   octx.beginPath();
-  if(prime){octx.moveTo(x1,y);octx.lineTo(x2,y);drawArrowHead(x2,y,1,0);}
-  else{octx.moveTo(x2,y);octx.lineTo(x1,y);drawArrowHead(x1,y,-1,0);}
-  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
-  octx.fillStyle='rgba(255,215,0,0.15)';octx.fillRect(sx,sy+gs-cs,gs,cs);
-  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
-  octx.fillText('D 下層（看不到）',sx+gs/2,sy+gs+28);
+  if(right){octx.moveTo(x1,y);octx.lineTo(x2,y);arrowHead(x2,y,1,0);}
+  else{octx.moveTo(x2,y);octx.lineTo(x1,y);arrowHead(x1,y,-1,0);}
+  octx.stroke();
 }
-function drawRightArrow(sx,sy,gs,cs,prime,dbl){
-  const x=sx+gs+8;const y1=sy+cs*0.5,y2=sy+gs-cs*0.5;
+function drawVArrow(x,y,h,down){
+  const y1=y+h*.15,y2=y+h*.85;
   octx.beginPath();
-  if(prime){octx.moveTo(x,y2);octx.lineTo(x,y1);drawArrowHead(x,y1,0,-1);}
-  else{octx.moveTo(x,y1);octx.lineTo(x,y2);drawArrowHead(x,y2,0,1);}
-  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
-  octx.fillStyle='rgba(255,215,0,0.15)';octx.fillRect(sx+gs-cs,sy,cs,gs);
-  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
-  octx.fillText('R',sx+gs+20,sy+gs/2+5);
+  if(down){octx.moveTo(x,y1);octx.lineTo(x,y2);arrowHead(x,y2,0,1);}
+  else{octx.moveTo(x,y2);octx.lineTo(x,y1);arrowHead(x,y1,0,-1);}
+  octx.stroke();
 }
-function drawLeftArrow(sx,sy,gs,cs,prime,dbl){
-  const x=sx-8;const y1=sy+cs*0.5,y2=sy+gs-cs*0.5;
-  octx.beginPath();
-  if(!prime){octx.moveTo(x,y2);octx.lineTo(x,y1);drawArrowHead(x,y1,0,-1);}
-  else{octx.moveTo(x,y1);octx.lineTo(x,y2);drawArrowHead(x,y2,0,1);}
-  octx.strokeStyle='#FFD700';octx.lineWidth=4;octx.stroke();
-  octx.fillStyle='rgba(255,215,0,0.15)';octx.fillRect(sx,sy,cs,gs);
-  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
-  octx.fillText('L',sx-20,sy+gs/2+5);
-}
-function drawBackArrow(sx,sy,gs,cs,prime,dbl){
-  // B layer is the far layer — not visible. Show dashed outline + text
-  octx.setLineDash([6,4]);
-  octx.strokeStyle='rgba(255,215,0,0.4)';octx.lineWidth=2;
-  octx.strokeRect(sx-4,sy-4,gs+8,gs+8);
-  octx.setLineDash([]);
-  octx.fillStyle='#FFD700';octx.font='bold 14px Nunito';octx.textAlign='center';
-  octx.fillText('B 後層（看不到，見右下圖）',sx+gs/2,sy-12);
-}
-function drawArrowHead(x,y,dx,dy){
-  const len=Math.sqrt(dx*dx+dy*dy)||1;
-  const ux=dx/len,uy=dy/len;
-  const hl=12,hw=7;
+function hl(x,y,w,h){octx.fillStyle='rgba(255,215,0,.12)';octx.fillRect(x,y,w,h);octx.fillStyle='#FFD700';}
+function arrowHead(x,y,dx,dy){
+  const len=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/len,uy=dy/len;
   octx.beginPath();
   octx.moveTo(x+ux*2,y+uy*2);
-  octx.lineTo(x-hl*ux+hw*uy,y-hl*uy-hw*ux);
-  octx.lineTo(x-hl*ux-hw*uy,y-hl*uy+hw*ux);
-  octx.closePath();
-  octx.fillStyle='#FFD700';octx.fill();
+  octx.lineTo(x-12*ux+7*uy,y-12*uy-7*ux);
+  octx.lineTo(x-12*ux-7*uy,y-12*uy+7*ux);
+  octx.closePath();octx.fill();
 }
 
-// ===== PERSPECTIVE GUIDE for B/D =====
-function drawPerspGuide(mv){
-  const c=document.getElementById('perspCanvas');
-  const ctx=c.getContext('2d');
-  const w=c.width,h=c.height;
-  ctx.clearRect(0,0,w,h);
-  const face=mv[0],prime=mv.includes("'"),dbl=mv.includes('2');
-  
+// ===== PERSPECTIVE GUIDE =====
+function drawPersp(mv){
+  const c=document.getElementById('perspC').getContext('2d');
+  c.clearRect(0,0,92,92);
+  const face=mv[0],prime=mv.includes("'");
   if(face==='B'){
-    // Draw isometric view from behind: show 3 layers, highlight back layer
-    // Layer 1 (front/nearest) - faded
-    ctx.fillStyle='rgba(255,255,255,0.1)';
-    ctx.fillRect(10,15,22,70);
-    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=0.5;
-    ctx.strokeRect(10,15,22,70);
-    // Layer 2 (mid) - faded
-    ctx.fillRect(36,15,22,70);
-    ctx.strokeRect(36,15,22,70);
-    // Layer 3 (back) - highlighted
-    ctx.fillStyle='rgba(255,140,0,0.3)';
-    ctx.fillRect(62,15,28,70);
-    ctx.strokeStyle='#FF5800';ctx.lineWidth=1.5;
-    ctx.strokeRect(62,15,28,70);
-    // Arrow on back layer
-    const cx=76,cy=50,r=16;
-    const dir=prime?-1:1;
-    ctx.beginPath();
-    for(let i=0;i<=12;i++){
-      const a=-Math.PI*0.6+(Math.PI*1.2*i/12)*dir;
-      const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
-      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
-    }
-    ctx.strokeStyle='#FFD700';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.stroke();
-    // Labels
-    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='8px sans-serif';ctx.textAlign='center';
-    ctx.fillText('近',21,90);ctx.fillText('中',47,90);
-    ctx.fillStyle='#FFD700';ctx.fillText('遠(轉這層)',76,90);
+    c.fillStyle='rgba(255,255,255,.1)';c.fillRect(8,10,20,65);c.fillRect(32,10,20,65);
+    c.strokeStyle='rgba(255,255,255,.2)';c.lineWidth=.5;c.strokeRect(8,10,20,65);c.strokeRect(32,10,20,65);
+    c.fillStyle='rgba(255,140,0,.3)';c.fillRect(56,10,26,65);
+    c.strokeStyle='#FF5800';c.lineWidth=1.5;c.strokeRect(56,10,26,65);
+    const cx=69,cy=42,r=14,dir=prime?-1:1;
+    c.beginPath();for(let i=0;i<=12;i++){const a=-Math.PI*.6+(Math.PI*1.2*i/12)*dir;i?c.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r):c.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}
+    c.strokeStyle='#FFD700';c.lineWidth=2.5;c.lineCap='round';c.stroke();
+    c.fillStyle='rgba(255,255,255,.4)';c.font='8px sans-serif';c.textAlign='center';
+    c.fillText('近',18,82);c.fillText('中',42,82);c.fillStyle='#FFD700';c.fillText('遠(轉)',69,82);
   }
   if(face==='D'){
-    // Top-down-ish view showing 3 horizontal layers, highlight bottom
-    ctx.fillStyle='rgba(255,255,255,0.1)';
-    ctx.fillRect(15,10,70,22);
-    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=0.5;
-    ctx.strokeRect(15,10,70,22);
-    ctx.fillRect(15,36,70,22);
-    ctx.strokeRect(15,36,70,22);
-    // Bottom layer highlighted
-    ctx.fillStyle='rgba(255,215,0,0.3)';
-    ctx.fillRect(15,62,70,28);
-    ctx.strokeStyle='#FFD500';ctx.lineWidth=1.5;
-    ctx.strokeRect(15,62,70,28);
-    // Arrow
-    const cx=50,cy=76,r=16;
-    const dir=prime?-1:1;
-    ctx.beginPath();
-    for(let i=0;i<=12;i++){
-      const a=-Math.PI*0.6+(Math.PI*1.2*i/12)*dir;
-      const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
-      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
-    }
-    ctx.strokeStyle='#FFD700';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='8px sans-serif';ctx.textAlign='center';
-    ctx.fillText('上',50,8);ctx.fillText('中',50,55);
-    ctx.fillStyle='#FFD700';ctx.fillText('下(轉這層)',50,98);
+    c.fillStyle='rgba(255,255,255,.1)';c.fillRect(12,8,65,20);c.fillRect(12,32,65,20);
+    c.strokeStyle='rgba(255,255,255,.2)';c.lineWidth=.5;c.strokeRect(12,8,65,20);c.strokeRect(12,32,65,20);
+    c.fillStyle='rgba(255,215,0,.3)';c.fillRect(12,56,65,26);
+    c.strokeStyle='#FFD500';c.lineWidth=1.5;c.strokeRect(12,56,65,26);
+    const cx=44,cy=69,r=14,dir=prime?-1:1;
+    c.beginPath();for(let i=0;i<=12;i++){const a=-Math.PI*.6+(Math.PI*1.2*i/12)*dir;i?c.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r):c.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}
+    c.strokeStyle='#FFD700';c.lineWidth=2.5;c.lineCap='round';c.stroke();
+    c.fillStyle='rgba(255,255,255,.4)';c.font='8px sans-serif';c.textAlign='center';
+    c.fillText('上',44,6);c.fillText('中',44,50);c.fillStyle='#FFD700';c.fillText('下(轉)',44,90);
   }
 }
 
-// ===== CUBE STATE MANIPULATION =====
-function rotateCW(face){
-  const f=cubeState[face];
-  cubeState[face]=[f[6],f[3],f[0],f[7],f[4],f[1],f[8],f[5],f[2]];
-}
-function cycleEdges(face){
+// ===== CUBE STATE =====
+function rotateCW(f){const s=cubeState[f];cubeState[f]=[s[6],s[3],s[0],s[7],s[4],s[1],s[8],s[5],s[2]];}
+function rotateCCW(f){const s=cubeState[f];cubeState[f]=[s[2],s[5],s[8],s[1],s[4],s[7],s[0],s[3],s[6]];}
+function cycle(f){
   const s=cubeState;let t;
-  switch(face){
+  switch(f){
     case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.R[0];s.F[1]=s.R[1];s.F[2]=s.R[2];s.R[0]=s.B[0];s.R[1]=s.B[1];s.R[2]=s.B[2];s.B[0]=s.L[0];s.B[1]=s.L[1];s.B[2]=s.L[2];s.L[0]=t[0];s.L[1]=t[1];s.L[2]=t[2];break;
     case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.L[6];s.F[7]=s.L[7];s.F[8]=s.L[8];s.L[6]=s.B[6];s.L[7]=s.B[7];s.L[8]=s.B[8];s.B[6]=s.R[6];s.B[7]=s.R[7];s.B[8]=s.R[8];s.R[6]=t[0];s.R[7]=t[1];s.R[8]=t[2];break;
     case'R':t=[s.F[2],s.F[5],s.F[8]];s.F[2]=s.D[2];s.F[5]=s.D[5];s.F[8]=s.D[8];s.D[2]=s.B[6];s.D[5]=s.B[3];s.D[8]=s.B[0];s.B[6]=s.U[2];s.B[3]=s.U[5];s.B[0]=s.U[8];s.U[2]=t[0];s.U[5]=t[1];s.U[8]=t[2];break;
@@ -2912,13 +2515,16 @@ function cycleEdges(face){
     case'B':t=[s.U[0],s.U[1],s.U[2]];s.U[0]=s.R[2];s.U[1]=s.R[5];s.U[2]=s.R[8];s.R[2]=s.D[8];s.R[5]=s.D[7];s.R[8]=s.D[6];s.D[8]=s.L[6];s.D[7]=s.L[3];s.D[6]=s.L[0];s.L[0]=t[0];s.L[3]=t[1];s.L[6]=t[2];break;
   }
 }
-function applyMoveToCubeState(mv){
-  const face=mv[0],prime=mv.includes("'"),dbl=mv.includes('2');
-  const n=dbl?2:(prime?3:1);
-  for(let i=0;i<n;i++){rotateCW(face);cycleEdges(face);}
+function applyMove(mv){
+  const f=mv[0],p=mv.includes("'"),d=mv.includes('2'),n=d?2:(p?3:1);
+  for(let i=0;i<n;i++){rotateCW(f);cycle(f);}
+}
+function undoMoveOnState(mv){
+  const f=mv[0],p=mv.includes("'"),d=mv.includes('2'),n=d?2:(p?1:3);
+  for(let i=0;i<n;i++){rotateCW(f);cycle(f);}
 }
 
-// ===== WAKE LOCK =====
+// Wake lock
 (async()=>{try{await navigator.wakeLock.request('screen')}catch(e){}})();
 </script>
 </body>
