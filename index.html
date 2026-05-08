@@ -2836,8 +2836,14 @@ function generateLBLScramble(targetStage){
   // Scramble stages in reverse order (7→targetStage)
   // Each scramble is the INVERSE of its LBL algorithm
   
-  // Stage 7 NOT included in auto-scramble (R D R' D' temporarily breaks first 2 layers)
-  // Stage 7 is practiced separately as its own exercise
+  if(targetStage<=7){
+    // Stage 7: Twist 2 corners using R D R' D' at DFR position
+    // 2 reps twist corner 1, D rotates, 4 reps twist corner 2, D' restores
+    // Solve = exact inverse of scramble (reverse order, flip each move)
+    const s7="R D R' D' R D R' D' D R D R' D' R D R' D' R D R' D' R D R' D' D'";
+    doMoves(s7);
+    stageBreaks.push({stage:7, moves:s7});
+  }
   
   if(targetStage<=6){
     // Stage 6: swap corners using D R D' L' D R' D' L
@@ -2887,9 +2893,9 @@ function showLBLIntro(){
   html+='</div>';
 
   // Practice stage 7 only
-  html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left;opacity:0.5">';
+  html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="startLBLPractice(7)">';
   html+='<div style="font-size:14px;font-weight:700;color:#eee">🔁 角塊翻轉（第7關）</div>';
-  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">開發中 — 此關需要特殊練習模式</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">只練翻角公式 R D R\' D\'，含安撫提示</div>';
   html+='</div>';
 
   html+='<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)">';
@@ -2911,9 +2917,8 @@ function startLBLPractice(fromStage){
   
   breaks.forEach(({stage, moves})=>{
     const stg=LBL_STAGES[stage-1];
+    // Solve = exact inverse of scramble (reverse order, flip each move)
     const mvArr=moves.trim().split(/\s+/);
-    // The solve moves = same as scramble moves (these are self-inverse after correct reps)
-    // Actually, to undo the scramble, we reverse the move list
     const solveMvs=mvArr.slice().reverse().map(m=>{
       if(m.includes("'"))return m.replace("'","");
       if(m.includes("2"))return m;
@@ -3166,9 +3171,64 @@ function showSolveStep(){
     }else{
       window._lblCelebrated=null;
     }
-    // Item 3: Stage 7 panic warning
+    // Item 3: Stage 7 enhanced panic warning with rep counter
     if(currentStg && currentStg.stage===7 && !window._lblScramblePhase){
-      progText=`⚠️ 不要怕！下面會暫時亂掉，堅持做完就會恢復！\n${currentStg.title} — 第 ${solveStep+1} 步`;
+      const localIdx=solveStep-currentStg.startIdx;
+      const totalMoves=currentStg.endIdx-currentStg.startIdx+1;
+      // Parse Stage 7 solve moves to identify corner sections
+      // Pattern: D + (R D R' D')×N + D + (R D R' D')×M + D'
+      // Each R D R' D' is 4 moves. Count which rep we're on.
+      const movesInStage=[];
+      for(let i=currentStg.startIdx;i<=currentStg.endIdx;i++)movesInStage.push(solution[i]);
+      
+      // Find sections: count consecutive R D R' D' groups
+      let repCount=0, inRep=false, cornerNum=1, totalReps=0;
+      let repPositions=[]; // {cornerNum, repNum, startLocal, endLocal}
+      let pos=0;
+      for(let i=0;i<movesInStage.length;){
+        const m=movesInStage;
+        if(i+3<movesInStage.length && movesInStage[i]==='R'&&movesInStage[i+1]==='D'&&movesInStage[i+2]==="R'"&&movesInStage[i+3]==="D'"){
+          totalReps++;
+          repPositions.push({corner:cornerNum, rep:totalReps, start:i, end:i+3});
+          i+=4;
+        }else{
+          if(movesInStage[i]==='D'||movesInStage[i]==="D'"){
+            if(totalReps>0)cornerNum++;
+          }
+          i++;
+        }
+      }
+      
+      // Find current rep
+      let currentRep=0, currentCorner=0, repsInCorner=0, repsNeeded=0;
+      for(const rp of repPositions){
+        if(localIdx>=rp.start && localIdx<=rp.end){
+          currentRep=rp.rep;
+          currentCorner=rp.corner;
+          break;
+        }
+      }
+      // Count reps for current corner
+      repsInCorner=repPositions.filter(r=>r.corner===currentCorner).length;
+      const repsDone=repPositions.filter(r=>r.corner===currentCorner&&r.end<localIdx).length;
+      
+      let s7html='<div style="background:rgba(255,165,0,.15);border:1px solid rgba(255,165,0,.4);border-radius:10px;padding:10px;text-align:center;margin-top:4px">';
+      s7html+='<div style="font-size:13px;font-weight:800;color:#FFA500">⚠️ 不要怕！下面會暫時亂掉</div>';
+      s7html+='<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px">堅持做完公式，魔法就會發生！</div>';
+      
+      if(currentCorner>0){
+        s7html+='<div style="margin-top:6px;font-size:12px;color:#fff">角塊 '+currentCorner+'：';
+        // Star progress
+        for(let i=0;i<repsInCorner;i++){
+          if(i<repsDone) s7html+='⭐';
+          else if(i===repsDone && localIdx>=repPositions.find(r=>r.corner===currentCorner&&r.rep===repsDone+1+repPositions.filter(r2=>r2.corner<currentCorner).length)?.start) s7html+='🌟';
+          else s7html+='☆';
+        }
+        s7html+=' ('+repsDone+'/'+repsInCorner+' 次)</div>';
+      }
+      s7html+='</div>';
+      
+      progText=`📚 ${currentStg.title} — 第 ${solveStep+1} 步\n`+s7html;
     }
   }
   document.getElementById('sMoveProg').innerHTML=progText.replace(/\n/g,'<br>');
