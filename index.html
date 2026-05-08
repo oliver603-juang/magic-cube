@@ -2291,23 +2291,60 @@ function doClassify(){
     if(a){s.color=a[0];cnt[a[0]]++;}
   });
 
-  FO.forEach(f=>{faceColors[f]=all.filter(s=>s.face===f).sort((a,b)=>a.pos-b.pos).map(s=>s.color);});
-
-  // Build facelet
-  let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
-  const fcnt={};for(const ch of fl)fcnt[ch]=(fcnt[ch]||0)+1;
-  const ok=!fl.includes('?')&&Object.values(fcnt).every(v=>v===9);
-  if(!ok){showError('顏色數量不對: '+JSON.stringify(fcnt));return;}
-
-  // Store ambiguity info: for each non-center sticker, how close was 2nd choice?
+  // Calculate ambiguity for each sticker (needed for edge constraint fixing)
   nonC.forEach(s=>{
     const sorted=Object.entries(s.dists).sort((a,b)=>a[1]-b[1]);
     s.bestDist=sorted[0][1];
     s.secondColor=sorted[1][0];
     s.secondDist=sorted[1][1];
     s.ambiguity=s.secondDist>0?(s.secondDist-s.bestDist)/s.secondDist:1;
-    // ambiguity close to 0 = very ambiguous (1st and 2nd choice nearly equal)
   });
+
+  FO.forEach(f=>{faceColors[f]=all.filter(s=>s.face===f).sort((a,b)=>a.pos-b.pos).map(s=>s.color);});
+
+  // === EDGE CONSTRAINT VALIDATION ===
+  // Adjacent faces share edge/corner stickers. Opposite colors (R↔O, W↔Y, B↔G)
+  // can NEVER appear on the same edge. If they do, swap the more ambiguous one.
+  const invalidPairs=[['R','O'],['W','Y'],['B','G']];
+  function isInvalidPair(c1,c2){return invalidPairs.some(([a,b])=>(c1===a&&c2===b)||(c1===b&&c2===a));}
+  
+  // Shared sticker positions between consecutive side faces (after CW rotation)
+  const edgeConstraints=[
+    // face1, pos1, face2, pos2 (these two stickers share an edge cubie)
+    ['F',5,'R',3], ['R',5,'B',3], ['B',5,'L',3], ['L',5,'F',3], // edge pieces (middle row)
+    ['F',2,'R',0], ['R',2,'B',0], ['B',2,'L',0], ['L',2,'F',0], // corner pieces (top)
+    ['F',8,'R',6], ['R',8,'B',6], ['B',8,'L',6], ['L',8,'F',6], // corner pieces (bottom)
+  ];
+  
+  let fixCount=0;
+  for(let pass=0;pass<3;pass++){ // multiple passes since fixing one might affect another
+    for(const [f1,p1,f2,p2] of edgeConstraints){
+      const c1=faceColors[f1][p1], c2=faceColors[f2][p2];
+      if(isInvalidPair(c1,c2)){
+        // Find the sticker objects
+        const s1=nonC.find(s=>s.face===f1&&s.pos===p1);
+        const s2=nonC.find(s=>s.face===f2&&s.pos===p2);
+        if(!s1||!s2) continue;
+        // Swap the more ambiguous one to its 2nd choice
+        if(s1.ambiguity<s2.ambiguity){
+          // s1 is more ambiguous → change it
+          s1.color=s1.secondColor;
+          faceColors[f1][p1]=s1.secondColor;
+        }else{
+          s2.color=s2.secondColor;
+          faceColors[f2][p2]=s2.secondColor;
+        }
+        fixCount++;
+      }
+    }
+  }
+  if(fixCount>0) console.log('Edge constraint fixes:', fixCount);
+
+  // Build facelet
+  let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
+  const fcnt={};for(const ch of fl)fcnt[ch]=(fcnt[ch]||0)+1;
+  const ok=!fl.includes('?')&&Object.values(fcnt).every(v=>v===9);
+  if(!ok){showError('顏色數量不對: '+JSON.stringify(fcnt));return;}
 
   // Sort by ambiguity: most ambiguous first
   const ambiguous=nonC.filter(s=>s.ambiguity<0.3).sort((a,b)=>a.ambiguity-b.ambiguity);
