@@ -2318,6 +2318,12 @@ function doScanCapture(){
   }
 }
 
+function showError(msg){
+  console.error('[ERROR]',msg);
+  document.getElementById('info').innerHTML='<span style="color:#E94560">'+msg+'</span>';
+  document.getElementById('btnRow').innerHTML='<button class="btn" onclick="location.reload()">重新開始</button>';
+}
+
 // ===== GLOBAL CLASSIFY + AUTO-REPAIR =====
 function doClassify(){
   try{ doClassifyInner(); }catch(e){
