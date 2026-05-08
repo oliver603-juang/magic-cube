@@ -2676,14 +2676,13 @@ function startSolveMode(){
 // Direct LBL entry from home screen (no scan needed)
 function startLBLDirect(){
   document.getElementById('startOv').classList.remove('show');
+  document.getElementById('startOv').style.display='none';
   mode='lbl';
   document.querySelector('.wrap').style.background='#000';
-  if(vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;}
-  vid.style.display='none';
+  try{if(vid&&vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;vid.style.display='none';}}catch(e){}
   if(ov)ov.style.display='none';
   document.getElementById('botBar').style.display='none';
   document.getElementById('topBar').style.display='none';
-  document.getElementById('solveUI').style.display='flex';
   showLBLIntro();
 }
 
@@ -3351,6 +3350,7 @@ function dojoGetRank(t){
 
 function showDojo(){
   document.getElementById('startOv').classList.remove('show');
+  document.getElementById('startOv').style.display='none';
   document.getElementById('dojoOv').classList.add('show');
   renderDojoMenu();
 }
@@ -3391,6 +3391,7 @@ function renderDojoMenu(){
 
 function dojoBack(){
   document.getElementById('dojoOv').classList.remove('show');
+  document.getElementById('startOv').style.display='';
   document.getElementById('startOv').classList.add('show');
 }
 
