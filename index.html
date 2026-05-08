@@ -2301,12 +2301,48 @@ function doClassify(){
   const anchors={};FO.forEach(f=>{anchors[CC[f]]=rawData[f][4];});
   all.forEach(s=>{if(s.pos===4)s.color=CC[s.face];});
 
+  // HSV conversion
+  function toHSV(r,g,b){
+    const rf=r/255,gf=g/255,bf=b/255;
+    const mx=Math.max(rf,gf,bf),mn=Math.min(rf,gf,bf),d=mx-mn;
+    const v=mx,s=mx>0?d/mx:0;
+    let h=0;
+    if(d>0.001){
+      if(mx===rf)h=60*(((gf-bf)/d)%6);
+      else if(mx===gf)h=60*((bf-rf)/d+2);
+      else h=60*((rf-gf)/d+4);
+      if(h<0)h+=360;
+    }
+    return [h,s,v];
+  }
+
+  // Smart distance: HSV-based with R-channel boost for red/orange zone
+  function smartDist(r,g,b,ar,ag,ab,c){
+    const [h,s,v]=toHSV(r,g,b);
+    const [ah,as,av]=toHSV(ar,ag,ab);
+    // White: low saturation → distance based on saturation diff
+    if(c==='W') return s*5 + Math.abs(v-av)*2;
+    // Skip white anchor for saturated pixels
+    if(s<0.15) return 10; // saturated pixel shouldn't match unsaturated anchor
+    // Hue distance (circular)
+    let hd=Math.abs(h-ah); hd=Math.min(hd,360-hd);
+    // Red/Orange zone (both hue near 0/360°): use R-channel as primary
+    const inRO=(h>300||h<40)&&(ah>300||ah<40);
+    if(inRO){
+      const rDiff=Math.abs(r-ar)/255;
+      const vDiff=Math.abs(v-av);
+      return rDiff*100 + vDiff*50 + hd*0.5;
+    }
+    // Normal: hue distance + value diff
+    return hd + Math.abs(v-av)*30;
+  }
+
   const nonC=all.filter(s=>s.pos!==4);
   nonC.forEach(s=>{
     s.dists={};
     Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{
       const[r,g,b]=s.rgb;
-      s.dists[c]=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);
+      s.dists[c]=smartDist(r,g,b,ar,ag,ab,c);
     });
   });
 
@@ -2385,6 +2421,80 @@ function doClassify(){
     }
   }
   if(fixCount>0) console.log('Edge constraint fixes:', fixCount);
+
+  // === CUBIE UNIQUENESS CONSTRAINT ===
+  // Each edge (2-color combo) and corner (3-color combo) must be unique.
+  // If duplicates found, swap the more ambiguous sticker of the duplicate.
+  const fc=faceColors; // shorthand
+  
+  // 12 edge cubies: [face1,pos1, face2,pos2]
+  const edgeCubies=[
+    ['U',7,'F',1], ['U',5,'R',1], ['U',1,'B',1], ['U',3,'L',1],
+    ['D',1,'F',7], ['D',5,'R',7], ['D',7,'B',7], ['D',3,'L',7],
+    ['F',5,'R',3], ['F',3,'L',5], ['B',3,'R',5], ['B',5,'L',3],
+  ];
+  // 8 corner cubies: [face1,pos1, face2,pos2, face3,pos3]
+  const cornerCubies=[
+    ['U',8,'F',2,'R',0], ['U',6,'F',0,'L',2], ['U',2,'B',0,'R',2], ['U',0,'B',2,'L',0],
+    ['D',2,'F',8,'R',6], ['D',0,'F',6,'L',8], ['D',8,'B',6,'R',8], ['D',6,'B',8,'L',6],
+  ];
+
+  function getEdgeKey(i){
+    const [f1,p1,f2,p2]=edgeCubies[i];
+    return [fc[f1][p1],fc[f2][p2]].sort().join('-');
+  }
+  function getCornerKey(i){
+    const [f1,p1,f2,p2,f3,p3]=cornerCubies[i];
+    return [fc[f1][p1],fc[f2][p2],fc[f3][p3]].sort().join('-');
+  }
+
+  // Check for duplicate edges
+  let cubieFixCount=0;
+  for(let pass=0;pass<3;pass++){
+    // Edges
+    for(let i=0;i<edgeCubies.length;i++){
+      for(let j=i+1;j<edgeCubies.length;j++){
+        if(getEdgeKey(i)===getEdgeKey(j)){
+          // Duplicate! Find the more ambiguous sticker among all 4 positions
+          const stickers=[];
+          [edgeCubies[i],edgeCubies[j]].forEach(([f1,p1,f2,p2])=>{
+            const s1=nonC.find(s=>s.face===f1&&s.pos===p1);
+            const s2=nonC.find(s=>s.face===f2&&s.pos===p2);
+            if(s1)stickers.push({s:s1,f:f1,p:p1});
+            if(s2)stickers.push({s:s2,f:f2,p:p2});
+          });
+          // Sort by ambiguity (most ambiguous first) and swap it
+          stickers.sort((a,b)=>(a.s.ambiguity||1)-(b.s.ambiguity||1));
+          if(stickers[0]&&stickers[0].s.secondColor){
+            stickers[0].s.color=stickers[0].s.secondColor;
+            fc[stickers[0].f][stickers[0].p]=stickers[0].s.secondColor;
+            cubieFixCount++;
+          }
+        }
+      }
+    }
+    // Corners
+    for(let i=0;i<cornerCubies.length;i++){
+      for(let j=i+1;j<cornerCubies.length;j++){
+        if(getCornerKey(i)===getCornerKey(j)){
+          const stickers=[];
+          [cornerCubies[i],cornerCubies[j]].forEach(cb=>{
+            for(let k=0;k<cb.length;k+=2){
+              const s=nonC.find(st=>st.face===cb[k]&&st.pos===cb[k+1]);
+              if(s)stickers.push({s,f:cb[k],p:cb[k+1]});
+            }
+          });
+          stickers.sort((a,b)=>(a.s.ambiguity||1)-(b.s.ambiguity||1));
+          if(stickers[0]&&stickers[0].s.secondColor){
+            stickers[0].s.color=stickers[0].s.secondColor;
+            fc[stickers[0].f][stickers[0].p]=stickers[0].s.secondColor;
+            cubieFixCount++;
+          }
+        }
+      }
+    }
+  }
+  if(cubieFixCount>0) console.log('Cubie uniqueness fixes:', cubieFixCount);
 
   // Build facelet
   let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
