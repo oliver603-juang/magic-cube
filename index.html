@@ -2262,7 +2262,7 @@ function doScanCapture(){
   }
 }
 
-// ===== GLOBAL CLASSIFY =====
+// ===== GLOBAL CLASSIFY + AUTO-REPAIR =====
 function doClassify(){
   const FO=['U','R','F','D','L','B'];
   const all=[];
@@ -2273,25 +2273,181 @@ function doClassify(){
   all.forEach(s=>{if(s.pos===4)s.color=CC[s.face];});
 
   const nonC=all.filter(s=>s.pos!==4);
-  nonC.forEach(s=>{s.dists={};Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{const[r,g,b]=s.rgb;s.dists[c]=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);});});
+  nonC.forEach(s=>{
+    s.dists={};
+    Object.entries(anchors).forEach(([c,[ar,ag,ab]])=>{
+      const[r,g,b]=s.rgb;
+      s.dists[c]=Math.sqrt((r-ar)**2+(g-ag)**2+(b-ab)**2);
+    });
+  });
+
+  // Greedy assignment
   const cnt={W:1,R:1,B:1,O:1,G:1,Y:1};
-  const cands=[];nonC.forEach(s=>{Object.entries(s.dists).forEach(([c,d])=>{cands.push({s,c,d});});});
+  const cands=[];
+  nonC.forEach(s=>{Object.entries(s.dists).forEach(([c,d])=>{cands.push({s,c,d});});});
   cands.sort((a,b)=>a.d-b.d);
   cands.forEach(({s,c})=>{if(s.color||cnt[c]>=9)return;s.color=c;cnt[c]++;});
-  nonC.filter(s=>!s.color).forEach(s=>{const a=Object.entries(cnt).find(([c,n])=>n<9);if(a){s.color=a[0];cnt[a[0]]++;}});
+  nonC.filter(s=>!s.color).forEach(s=>{
+    const a=Object.entries(cnt).find(([c,n])=>n<9);
+    if(a){s.color=a[0];cnt[a[0]]++;}
+  });
 
   FO.forEach(f=>{faceColors[f]=all.filter(s=>s.face===f).sort((a,b)=>a.pos-b.pos).map(s=>s.color);});
 
+  // Build facelet
   let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
   const fcnt={};for(const ch of fl)fcnt[ch]=(fcnt[ch]||0)+1;
   const ok=!fl.includes('?')&&Object.values(fcnt).every(v=>v===9);
   if(!ok){showError('顏色數量不對: '+JSON.stringify(fcnt));return;}
 
-  // Show result briefly then solve
+  // Store ambiguity info: for each non-center sticker, how close was 2nd choice?
+  nonC.forEach(s=>{
+    const sorted=Object.entries(s.dists).sort((a,b)=>a[1]-b[1]);
+    s.bestDist=sorted[0][1];
+    s.secondColor=sorted[1][0];
+    s.secondDist=sorted[1][1];
+    s.ambiguity=s.secondDist>0?(s.secondDist-s.bestDist)/s.secondDist:1;
+    // ambiguity close to 0 = very ambiguous (1st and 2nd choice nearly equal)
+  });
+
+  // Sort by ambiguity: most ambiguous first
+  const ambiguous=nonC.filter(s=>s.ambiguity<0.3).sort((a,b)=>a.ambiguity-b.ambiguity);
+  
   const anchorStr=Object.entries(anchors).map(([c,[r,g,b]])=>`${c}=(${r},${g},${b})`).join(' ');
-  document.getElementById('info').innerHTML=`顏色分析完成 ✅<br><span style="font-size:9px;color:rgba(255,255,255,.4)">Facelet: ${fl}<br>Anchors: ${anchorStr}</span>`;
+  
+  // Try to solve — if invalid, auto-swap ambiguous pairs
+  document.getElementById('info').innerHTML=`分析完成，驗證中...<br><span style="font-size:9px;color:rgba(255,255,255,.35)">${anchorStr}</span>`;
   showFacePreviews('mgrid');
-  document.getElementById('btnRow').innerHTML=`<button class="btn" onclick="doSolve('${fl}')">🚀 開始解題</button>`;
+  document.getElementById('btnRow').innerHTML='<div style="color:rgba(255,255,255,.5);font-size:12px">驗證魔方狀態...</div>';
+
+  tryAutoRepair(fl, nonC, ambiguous, 0);
+}
+
+function tryAutoRepair(fl, nonC, ambiguous, attempt){
+  if(attempt>20){
+    // Give up auto-repair, show editable view
+    document.getElementById('info').innerHTML='<span style="color:#E94560">自動修正失敗，請手動確認顏色</span>';
+    showEditableFaces();
+    document.getElementById('btnRow').innerHTML='<button class="btn" onclick="finalizeSolve()">✅ 確認後解題</button>';
+    return;
+  }
+
+  // Try solving with 3-second timeout via worker
+  const solveTimeout=setTimeout(()=>{
+    // Solver timed out = invalid state
+    // Swap the most ambiguous sticker to its 2nd choice
+    if(attempt<ambiguous.length){
+      const s=ambiguous[attempt];
+      // Find another sticker with opposite swap
+      const swapPartner=ambiguous.find(p=>p!==s&&p.color===s.secondColor&&
+        (p.secondColor===s.color||p.dists[s.color]<p.dists[p.color]*1.5));
+      
+      if(swapPartner){
+        // Swap colors
+        const tmp=s.color;s.color=swapPartner.color;swapPartner.color=tmp;
+      }else{
+        // Just change this one to 2nd choice and find someone to swap back
+        const otherSame=nonC.find(p=>p!==s&&p.color===s.secondColor&&p.ambiguity<0.5);
+        if(otherSame){
+          s.color=s.secondColor;
+          otherSame.color=s.secondColor===otherSame.color?otherSame.secondColor:s.secondColor;
+        }else{
+          s.color=s.secondColor;
+        }
+      }
+
+      // Rebuild faceColors and facelet
+      const FO=['U','R','F','D','L','B'];
+      const all=[...nonC];
+      FO.forEach(f=>{
+        const centerColor=CC[f];
+        const faceStickers=all.filter(st=>st.face===f).sort((a,b)=>a.pos-b.pos);
+        faceColors[f]=[];
+        for(let i=0;i<9;i++){
+          if(i===4) faceColors[f].push(centerColor);
+          else{
+            const st=faceStickers.find(s=>s.pos===i);
+            faceColors[f].push(st?st.color:'?');
+          }
+        }
+      });
+
+      let newFl='';FO.forEach(f=>{faceColors[f].forEach(x=>newFl+=C2F[x]||'?');});
+      document.getElementById('info').textContent=`修正嘗試 ${attempt+1}...`;
+      showFacePreviews('mgrid');
+      
+      tryAutoRepair(newFl, nonC, ambiguous, attempt+1);
+    }else{
+      // No more ambiguous stickers to swap
+      document.getElementById('info').innerHTML='<span style="color:#E94560">自動修正失敗，請手動確認</span>';
+      showEditableFaces();
+      document.getElementById('btnRow').innerHTML='<button class="btn" onclick="finalizeSolve()">✅ 確認後解題</button>';
+    }
+  }, 3000);
+
+  solverCB=(err,sol)=>{
+    clearTimeout(solveTimeout);
+    if(err){
+      // Error from solver (not timeout) - try next swap
+      tryAutoRepair(fl, nonC, ambiguous, attempt+1);
+      return;
+    }
+    // SUCCESS! Solver returned a solution
+    solution=sol.trim().split(/\s+/);
+    if(!sol||!sol.trim()){
+      document.getElementById('doneOv').classList.add('show');
+      return;
+    }
+    document.getElementById('info').innerHTML=`✅ 驗證成功！${attempt>0?'(修正了'+attempt+'次)':''}`;
+    showFacePreviews('mgrid');
+    document.getElementById('btnRow').innerHTML=
+      `<button class="btn" onclick="startSolveMode()">🚀 開始解題 (${solution.length} 步)</button>`;
+  };
+  solverWorker.postMessage({t:'solve',fl});
+}
+
+function startSolveMode(){
+  solveStep=-1;
+  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...faceColors[f]]);
+  mode='solve';
+  showSolveStep();
+}
+
+let editSelColor='W';
+function showEditableFaces(){
+  const mg=document.getElementById('mgrid');
+  mg.style.display='block';mg.style.width='auto';
+  let html='<div style="display:flex;gap:6px;justify-content:center;margin-bottom:8px">';
+  'WRYOBG'.split('').forEach(c=>{
+    html+=`<div onclick="editSelColor='${c}';showEditableFaces()" style="width:28px;height:28px;border-radius:6px;background:${CMAP[c]};border:${editSelColor===c?'3px solid #fff':'2px solid rgba(255,255,255,.2)'};cursor:pointer"></div>`;
+  });
+  html+='</div>';
+  html+='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">';
+  ['U','R','F','D','L','B'].forEach(f=>{
+    const c=faceColors[f];if(!c)return;
+    html+=`<div style="text-align:center"><div style="font-size:9px;color:rgba(255,255,255,.5);margin-bottom:2px">${f}</div>`;
+    html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">`;
+    c.forEach((x,i)=>{
+      const isCenter=i===4;
+      html+=`<div onclick="${isCenter?'':`faceColors['${f}'][${i}]=editSelColor;showEditableFaces()`}" style="width:18px;height:18px;border-radius:3px;background:${CMAP[x]||'#333'};border:1px solid rgba(255,255,255,.2);cursor:${isCenter?'default':'pointer'};${isCenter?'opacity:.6':''}"></div>`;
+    });
+    html+=`</div></div>`;
+  });
+  html+='</div>';
+  mg.innerHTML=html;
+}
+
+function finalizeSolve(){
+  const FO=['U','R','F','D','L','B'];
+  let fl='';FO.forEach(f=>{faceColors[f].forEach(x=>fl+=C2F[x]||'?');});
+  const fcnt={};for(const ch of fl)fcnt[ch]=(fcnt[ch]||0)+1;
+  const ok=!fl.includes('?')&&Object.values(fcnt).every(v=>v===9);
+  if(!ok){
+    document.getElementById('info').innerHTML=`<span style="color:#E94560">每色需要 9 個: ${JSON.stringify(fcnt)}</span>`;
+    return;
+  }
+  doSolve(fl);
+}
 }
 
 function showFacePreviews(targetId){
