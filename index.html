@@ -2787,12 +2787,20 @@ function startLBLMode(){
 // Each stage's scramble is the INVERSE of its solve algorithm.
 
 const LBL_STAGES=[
-  {n:1,name:'白色十字',icon:'✚',desc:'在上白面排出白色十字，邊塊顏色要對齊側面中心',formula:'直覺',
-   tip:'找到白色邊塊，把它轉到上白面，讓兩面顏色都對齊'},
+  {n:1,name:'白色十字',icon:'✚',desc:'在上白面排出白色十字，邊塊顏色要對齊側面中心',formula:'直覺（1~2步）',
+   tip:'找到飛走的白色邊塊，把它轉回上白面',
+   chant:'找到白邊｜轉回上面｜對齊中心',
+   groups:null,groupLabels:null},
   {n:2,name:'第一層角塊',icon:'🔲',desc:'用右手公式把白色角塊放到正確位置',formula:"R U R' U'",
-   tip:'把白色角塊移到它的家的正上方，重複右手公式直到歸位'},
+   tip:'白色角塊在上層？重複右手公式直到它掉進正確角落',
+   chant:'右推｜上轉｜右回｜上回',
+   groups:[[0,0],[1,1],[2,2],[3,3]],
+   groupLabels:['推','轉','回','回']},
   {n:3,name:'第二層邊塊',icon:'⬛',desc:'把中間層的邊塊插入正確位置',formula:"U R U' R' U' F' U F",
-   tip:'找到頂層沒有黃色的邊塊，讓它遠離目標方向，再用公式插入'},
+   tip:'找到頂層沒有黃色的邊塊，對齊後用8步公式插入',
+   chant:'上轉 右推｜上回 右回｜上回 前回｜上轉 前推',
+   groups:[[0,1],[2,3],[4,5],[6,7]],
+   groupLabels:['上右','回回','回前','上前']},
   {n:4,name:'黃色十字',icon:'✚',desc:'在下黃面做出黃色十字',formula:"B R D R' D' B'",
    tip:'看下黃面的圖案：圓點→L形→一字→十字，每次一個公式',
    chant:'後開｜右推 下轉｜右回 下回｜後關',
@@ -2863,6 +2871,39 @@ function generateLBLScramble(targetStage){
     stageBreaks.push({stage:4, moves:"B R D R' D' B'"});
   }
   
+  if(targetStage<=3){
+    // Stage 3: Pull out one second-layer edge using the insert formula backwards
+    // Right insert: U R U' R' U' F' U F — pulling out = same formula (it ejects the edge)
+    const s3="U R U' R' U' F' U F";
+    doMoves(s3);
+    stageBreaks.push({stage:3, moves:s3});
+  }
+  
+  if(targetStage<=2){
+    // Stage 2: Pull out one first-layer corner using R U R' U' (repeat displaces corner)
+    // Apply 1x to eject the FR-U corner from its position
+    const s2="R U R' U'";
+    doMoves(s2);
+    stageBreaks.push({stage:2, moves:s2});
+  }
+  
+  if(targetStage<=1){
+    // Stage 1: White cross — 7 different scramble patterns (random pick)
+    // Each pattern displaces 1-4 white edge pieces in different ways
+    const crossPatterns=[
+      {name:'前邊飛走',moves:"F"},                         // 1 edge displaced
+      {name:'右邊飛走',moves:"R"},                          // 1 edge displaced  
+      {name:'前右交換',moves:"F R"},                        // 2 edges displaced
+      {name:'左後交叉',moves:"L' B'"},                     // 2 edges displaced
+      {name:'三邊亂飛',moves:"F R L'"},                    // 3 edges displaced
+      {name:'十字消失',moves:"F R B L"},                   // 4 edges displaced (all cross gone)
+      {name:'大風吹',moves:"F R' B L'"},                   // 4 edges displaced (twist pattern)
+    ];
+    const pick=crossPatterns[Math.floor(Math.random()*crossPatterns.length)];
+    doMoves(pick.moves);
+    stageBreaks.push({stage:1, moves:pick.moves, patternName:pick.name});
+  }
+  
   return {state:s, stageBreaks};
 }
 
@@ -2876,12 +2917,42 @@ function showLBLIntro(){
   html+='<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:12px;line-height:1.5">從已完成的魔方開始，用 LBL 公式一關一關練習<br>每次只打亂你要練習的部分！</div>';
   html+='<div style="margin-bottom:14px"><button class="btn btn-sm" style="background:rgba(255,215,0,.15);color:#FFD700;border:1px solid rgba(255,215,0,.3)" onclick="showLBL7Overview()">📖 LBL 七關總覽</button></div>';
   html+='<div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:8px">選擇練習關卡</div>';
-  html+='<div style="background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="showStageExplainer(4)">';
-  html+='<div style="font-size:15px;font-weight:700;color:#FFD700">🌟 最後一層（第4-7關）</div>';
-  html+='<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px">推薦新手！只打亂下黃層，練習4個公式</div></div>';
+
+  // Full 1-7
+  html+='<div style="background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="showStageExplainer(1)">';
+  html+='<div style="font-size:15px;font-weight:700;color:#FFD700">🏆 全部七關（第1-7關）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px">完整 LBL 流程！從白色十字練到最後翻角</div></div>';
+
+  html+='<div style="font-size:10px;color:rgba(255,255,255,.25);margin:6px 0;text-align:center">── 前兩層 ──</div>';
+
+  // Stage 1 only
+  html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="showStageExplainer(1)">';
+  html+='<div style="font-size:14px;font-weight:700;color:#eee">✚ 白色十字（第1關）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">7 種隨機打亂模式，練習找回白色邊塊</div></div>';
+
+  // Stage 2
+  html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="showStageExplainer(2)">';
+  html+='<div style="font-size:14px;font-weight:700;color:#eee">🔲 第一層角塊（第2關）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">練習 R U R\' U\' 右手公式送角塊回家</div></div>';
+
+  // Stage 3
+  html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="showStageExplainer(3)">';
+  html+='<div style="font-size:14px;font-weight:700;color:#eee">⬛ 第二層邊塊（第3關）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">練習 8 步插入公式</div></div>';
+
+  html+='<div style="font-size:10px;color:rgba(255,255,255,.25);margin:6px 0;text-align:center">── 最後一層 ──</div>';
+
+  // Stage 4-7
+  html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="showStageExplainer(4)">';
+  html+='<div style="font-size:14px;font-weight:700;color:#eee">🌟 最後一層（第4-7關）</div>';
+  html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">只打亂下黃層，練習4個公式</div></div>';
+
+  // Stage 5-7
   html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="showStageExplainer(5)">';
   html+='<div style="font-size:14px;font-weight:700;color:#eee">🔄 邊塊+角塊（第5-7關）</div>';
   html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">已學會黃色十字，練習歸位和翻轉</div></div>';
+
+  // Stage 7 only
   html+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left" onclick="showStageExplainer(7)">';
   html+='<div style="font-size:14px;font-weight:700;color:#eee">🔁 角塊翻轉（第7關）</div>';
   html+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:4px">只練翻角公式 R D R\' D\'</div></div>';
@@ -2935,21 +3006,25 @@ function showStageExplainer(fromStage){
   const C={W:'#fff',R:'#B71234',B:'#0046AD',O:'#FF5800',G:'#009B48',Y:'#FFD500'};
   function df(colors,sz){var cs=sz/3;var s='<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">';for(var r=0;r<3;r++)for(var c=0;c<3;c++)s+='<rect x="'+(c*cs+1)+'" y="'+(r*cs+1)+'" width="'+(cs-2)+'" height="'+(cs-2)+'" rx="3" fill="'+(C[colors[r*3+c]]||'#333')+'" stroke="rgba(0,0,0,.3)" stroke-width=".5"/>';return s+'</svg>';}
   var result=generateLBLScramble(fromStage);
+  var solvedU=['W','W','W','W','W','W','W','W','W'];
   var solvedD=['Y','Y','Y','Y','Y','Y','Y','Y','Y'];
-  var scrambledD=result.state.D;
+  var showFace=fromStage<=3?'U':'D';
+  var scrambledFace=showFace==='U'?result.state.U:result.state.D;
+  var solvedFaceColors=showFace==='U'?solvedU:solvedD;
+  var faceLabel=showFace==='U'?'U面(上白)':'D面(下黃)';
   var stages=result.stageBreaks.map(function(b){return b.stage;}).sort();
-  var SI={4:{i:'✚',n:'黃色十字',g:'讓下黃面出現十字',c:'#FF5800'},5:{i:'🔄',n:'邊塊歸位',g:'讓十字邊塊顏色對齊側面',c:'#00D2FF'},6:{i:'📐',n:'角塊歸位',g:'把角塊移到正確角落（可能還歪的）',c:'#009B48'},7:{i:'🔁',n:'角塊翻轉',g:'翻轉角塊讓黃色朝下 → 完成！',c:'#FFD700'}};
+  var SI={1:{i:'✚',n:'白色十字',g:'找回飛走的白色邊塊，排出白色十字',c:'#FFD700'},2:{i:'🔲',n:'第一層角塊',g:'用右手公式把角塊送回正確角落',c:'#FFD700'},3:{i:'⬛',n:'第二層邊塊',g:'用8步公式把邊塊插入中間層',c:'#FFD700'},4:{i:'✚',n:'黃色十字',g:'讓下黃面出現十字',c:'#FF5800'},5:{i:'🔄',n:'邊塊歸位',g:'讓十字邊塊顏色對齊側面',c:'#00D2FF'},6:{i:'📐',n:'角塊歸位',g:'把角塊移到正確角落（可能還歪的）',c:'#009B48'},7:{i:'🔁',n:'角塊翻轉',g:'翻轉角塊讓黃色朝下 → 完成！',c:'#FFD700'}};
   var h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:12px;overflow-y:auto">';
   h+='<div style="font-size:20px;font-weight:900;color:#FFD700;margin-bottom:8px">🎯 這次的任務</div>';
   h+='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">';
   stages.forEach(function(sn){var si=SI[sn];if(si)h+='<div style="background:rgba(255,255,255,.08);border:1px solid '+si.c+';border-radius:8px;padding:3px 10px;font-size:12px;color:'+si.c+'">'+si.i+' '+si.n+'</div>';});
   h+='</div>';
   h+='<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0">';
-  h+='<div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.4)">✅ 完成</div>'+df(solvedD,66)+'<div style="font-size:8px;color:rgba(255,255,255,.3)">D面</div></div>';
+  h+='<div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.4)">✅ 完成</div>'+df(solvedFaceColors,66)+'<div style="font-size:8px;color:rgba(255,255,255,.3)">'+faceLabel+'</div></div>';
   h+='<div style="text-align:center"><div style="font-size:18px;color:#FF5800">→</div><div style="font-size:9px;color:#FF5800">打亂</div></div>';
-  h+='<div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.4)">🔀 打亂後</div>'+df(scrambledD,66)+'<div style="font-size:8px;color:rgba(255,255,255,.3)">D面</div></div>';
+  h+='<div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.4)">🔀 打亂後</div>'+df(scrambledFace,66)+'<div style="font-size:8px;color:rgba(255,255,255,.3)">'+faceLabel+'</div></div>';
   h+='<div style="text-align:center"><div style="font-size:18px;color:#00D2FF">→</div><div style="font-size:9px;color:#00D2FF">還原</div></div>';
-  h+='<div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.4)">🎉 目標</div>'+df(solvedD,66)+'<div style="font-size:8px;color:rgba(255,255,255,.3)">D面</div></div>';
+  h+='<div style="text-align:center"><div style="font-size:10px;color:rgba(255,255,255,.4)">🎉 目標</div>'+df(solvedFaceColors,66)+'<div style="font-size:8px;color:rgba(255,255,255,.3)">'+faceLabel+'</div></div>';
   h+='</div>';
   h+='<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:10px;margin:10px 0;text-align:left">';
   stages.forEach(function(sn){var si=SI[sn];if(!si)return;var stg=LBL_STAGES[sn-1];h+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.06)"><div style="font-size:13px;font-weight:700;color:'+si.c+'">'+si.i+' 第'+sn+'關：'+si.n+'</div><div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px">'+si.g+'</div><div style="font-size:11px;color:#00D2FF;font-family:monospace;margin-top:2px">公式：'+stg.formula+'</div>';if(stg.chant)h+='<div style="font-size:11px;color:#FFD700;margin-top:1px">🎵 '+stg.chant+'</div>';h+='</div>';});
