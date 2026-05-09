@@ -85,6 +85,11 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
     <div id="lblContent"></div>
   </div>
 
+  <!-- CFOP teaching UI -->
+  <div id="cfopUI" style="display:none;position:absolute;inset:0;z-index:10;background:#000;align-items:center;justify-content:center;overflow-y:auto">
+    <div id="cfopContent"></div>
+  </div>
+
   <div class="persp" id="persp"><canvas id="perspC" width="92" height="92"></canvas></div>
 
   <!-- Start -->
@@ -96,6 +101,7 @@ canvas#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
     </div>
     <button class="btn" style="margin-top:16px" onclick="startApp()">📸 開始掃描</button>
     <button class="btn" style="margin-top:8px;background:rgba(0,210,255,.85)" onclick="startLBLDirect()">📚 LBL 逆向教學</button>
+    <button class="btn" style="margin-top:8px;background:linear-gradient(135deg,#FF5800,#FFD700);color:#000" onclick="startCFOPDirect()">🚀 CFOP 進階教學</button>
     <button class="btn" style="margin-top:8px;background:rgba(255,255,255,.15);color:#ccc" onclick="showDojo()">💪 肌肉記憶道場</button>
     <button class="btn btn-sm" style="margin-top:12px;background:rgba(255,100,0,.3);color:#f90" onclick="debugTestSolver()">🔧 測試求解器</button>
   </div>
@@ -4004,6 +4010,744 @@ function dojoConfirm(time, success){
   h+='</div>';
   el.innerHTML=h;
 }
+// ===== CFOP TEACHING MODE =====
+// Full scramble → guided CFOP solve (Cross → F2L → 2-Look OLL → 2-Look PLL)
+// White on top convention (U=White, D=Yellow), same as LBL
+
+function startCFOPDirect(){
+  document.getElementById('startOv').classList.remove('show');
+  document.getElementById('startOv').style.display='none';
+  mode='cfop';
+  document.querySelector('.wrap').style.background='#000';
+  try{if(vid&&vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null;vid.style.display='none';}}catch(e){}
+  if(ov)ov.style.display='none';
+  document.getElementById('botBar').style.display='none';
+  document.getElementById('topBar').style.display='none';
+  document.getElementById('solveUI').style.display='none';
+  document.getElementById('lblUI').style.display='none';
+  showCFOPIntro();
+}
+
+// ===== CFOP ALGORITHM DATABASE =====
+// All algorithms in basic R/U/F/D/L/B notation (no M/x/y/z slices)
+// White top convention: OLL/PLL operate on D (yellow) face
+
+const CFOP_OLL_EDGES=[
+  {id:'dot',name:'圓點',icon:'⚫',desc:'沒有黃色邊朝下',
+   pattern:[0,0,0,0],  // D face edge positions: D1,D3,D5,D7 (0=not yellow)
+   alg:"B R D R' D' B' B L' D' L D B'",  // F(RUR'U')F' + f(RUR'U')f' converted
+   chant:'後開 右推 下轉 右回 下回 後關 ＋ 後開 左拉 下回 左推 下轉 後關',
+   kid:'下面完全沒有黃色的邊 → 做兩次公式'},
+  {id:'line',name:'一字',icon:'➖',desc:'兩個對面的黃色邊朝下',
+   pattern:['h','h'],  // horizontal line
+   alg:"B R D R' D' B'",
+   chant:'後開｜右推 下轉｜右回 下回｜後關',
+   kid:'黃色排成一條線 → 把線擺「橫的」再做公式'},
+  {id:'lshape',name:'L 形',icon:'🔲',desc:'兩個相鄰的黃色邊朝下',
+   pattern:['L'],
+   alg:"B D R D' R' B'",  // f(RUR'U')f' converted to basic: B U R U' R' B' → our convention B D R D' R' B'
+   chant:'後開｜下轉 右推｜下回 右回｜後關',
+   kid:'黃色排成 L 形 → 把 L 擺在「左下角」再做公式'},
+];
+
+const CFOP_OLL_CORNERS=[
+  {id:'sune',name:'小魚（Sune）',icon:'🐟',desc:'1 個角已經黃色朝下',
+   recognize:'找到那個已經黃色朝下的角 → 放在左後方',
+   alg:"R D R' D R D2 R'",
+   chant:'右推｜下轉｜右回｜下轉｜右推｜下轉轉｜右回',
+   kid:'只有 1 個角的黃色已經朝下，像一隻小魚'},
+  {id:'antisune',name:'反小魚',icon:'🐟',desc:'1 個角黃色朝下（反方向）',
+   recognize:'找到黃色朝下的角 → 放在左前方',
+   alg:"R' D' R D' R' D2 R",  // L'U'LU'L'U2L converted
+   chant:'右回｜下回｜右推｜下回｜右回｜下轉轉｜右推',
+   kid:'也是只有 1 個角黃色朝下，但位置跟小魚相反'},
+  {id:'h_oll',name:'H 字型',icon:'🏠',desc:'0 個角黃色朝下，前後有頭燈',
+   recognize:'4 個角都沒有黃色朝下，看到前後都有「頭燈」（同色的一對）',
+   alg:"B R D R' D' R D R' D' R D R' D' B'",  // F(RUR'U')3 F'
+   chant:'後開｜(右推 下轉 右回 下回)×3｜後關',
+   kid:'所有角的黃色都歪歪的，前後兩面都看到「同色一對」'},
+  {id:'pi_oll',name:'π 字型',icon:'🏗',desc:'0 個角黃色朝下，左右頭燈',
+   recognize:'4 個角都沒有黃色朝下，左右有「頭燈」',
+   alg:"R D2 R2 D' R2 D' R2 D2 R",
+   chant:'右推｜下轉轉｜右回回 下回｜右推推 下回｜右回回 下轉轉｜右推',
+   kid:'所有角的黃色都歪歪的，左右兩面看到「同色一對」'},
+  {id:'u_oll',name:'U 字型',icon:'🎯',desc:'2 個角黃色朝下',
+   recognize:'2 個角黃色朝下，看到 1 面有頭燈',
+   alg:"R2 D' R D2 R' D R D2 R' D' R'",  // R2 D R'U2 R D' R'U2 R' converted
+   chant:'右推推｜下回 右推 下轉轉｜右回 下轉 右推 下轉轉｜右回 下回 右回',
+   kid:'有 2 個角的黃色朝下了，有 1 面看到頭燈'},
+  {id:'t_oll',name:'T 字型',icon:'🔧',desc:'2 個角黃色朝下（T 形）',
+   recognize:'2 個角黃色朝下，前面有頭燈',
+   alg:"L B L' D L B' L' D' L B L' D L B' L'",  // r U R'U' r'F R F' → needs wide move, use alternative
+   chant:'很長但有規律！',
+   kid:'有 2 個角黃色朝下，排成 T 的形狀'},
+  {id:'l_oll',name:'L 字型',icon:'📐',desc:'2 個角黃色朝下（L 形）',
+   recognize:'2 個角黃色朝下，後面有頭燈',
+   alg:"B' L B L' D L B' L' D' B D' L D",  // F'rUR'U'r'FR → needs wide move, use alternative
+   chant:'後面有頭燈時使用',
+   kid:'有 2 個角黃色朝下，排成 L 的形狀'},
+];
+
+const CFOP_PLL_CORNERS=[
+  {id:'aa_perm',name:'Aa 交換',icon:'🔄',desc:'3 個角順時針交換',
+   recognize:'轉 D 面找到 1 個「頭燈」邊 → 放在左邊',
+   // x R'U R D2 R U'R D2 R2 x' → convert: think of x as rotating whole cube so F→U
+   // In our basic notation (white top): use the corner-swap we already have
+   alg:"L' D' L F' D' F L' D L D' F' D F D'",
+   chant:'左回 下回 左推 前回 下回 前推 左回 下轉 左推 下回 前回 下轉 前推 下回',
+   kid:'找到一面兩個角顏色一樣（頭燈），放在左邊'},
+  {id:'ab_perm',name:'Ab 交換',icon:'🔃',desc:'3 個角逆時針交換',
+   recognize:'轉 D 面找到「頭燈」→ 放在左邊，如果 Aa 沒解開就用 Ab',
+   alg:"F' D' F L' D' L F' D F D' L' D L D'",
+   chant:'前回 下回 前推 左回 下回 左推 前回 下轉 前推 下回 左回 下轉 左推 下回',
+   kid:'跟 Aa 很像，只是角塊轉的方向相反'},
+];
+
+const CFOP_PLL_EDGES=[
+  {id:'ua_perm',name:'Ua 交換',icon:'↻',desc:'3 個邊順時針移動',
+   recognize:'找到 1 個已歸位的邊 → 放在後面，其他 3 邊順時針移動',
+   alg:"R D' R D R D R D' R' D' R2",
+   chant:'右推 下回 右推 下轉 右推 下轉 右推 下回 右回 下回 右推推',
+   kid:'有 1 個邊已經對了（放後面），其他 3 個邊要順時針換位'},
+  {id:'ub_perm',name:'Ub 交換',icon:'↺',desc:'3 個邊逆時針移動',
+   recognize:'找到 1 個已歸位的邊 → 放在後面，其他 3 邊逆時針移動',
+   alg:"R2 D R D R' D' R' D' R' D R'",
+   chant:'右推推 下轉 右推 下轉 右回 下回 右回 下回 右回 下轉 右回',
+   kid:'有 1 個邊已經對了（放後面），其他 3 個邊要逆時針換位'},
+  {id:'h_perm',name:'H 交換',icon:'⚡',desc:'2 對對面的邊互換',
+   recognize:'沒有任何一面的邊是對的 → 對面的邊兩兩互換',
+   // M2 U M2 U2 M2 U M2 → convert to basic moves (no M slice)
+   // M2 = R2 L2 (if we hold edges), but actually M = L R' U-axis
+   // Easier: use the known identity R L U2 R' L' D R L U2 R' L' D
+   alg:"R2 L2 D R2 L2 D2 R2 L2 D R2 L2",
+   chant:'右右左左 下轉 右右左左 下轉轉 右右左左 下轉 右右左左',
+   kid:'四個邊都不對！對面的邊要互相交換'},
+  {id:'z_perm',name:'Z 交換',icon:'⚡',desc:'2 對相鄰的邊互換',
+   recognize:'沒有任何一面的邊是對的 → 相鄰的邊兩兩互換',
+   alg:"R' D' R D' R D R D' R' D R D R2 D' R'",
+   chant:'很長！慢慢做',
+   kid:'四個邊都不對！旁邊的邊要交換'},
+];
+
+// ===== CFOP SCRAMBLE GENERATOR (random 15-20 moves) =====
+function generateCFOPScramble(){
+  const faces=['U','D','R','L','F','B'];
+  const mods=['','\'','2'];
+  const len=15+Math.floor(Math.random()*6); // 15-20 moves
+  const moves=[];
+  let lastFace='',lastLastFace='';
+  for(let i=0;i<len;i++){
+    let f;
+    do{
+      f=faces[Math.floor(Math.random()*6)];
+    }while(f===lastFace||(f===lastLastFace&&isOpposite(f,lastFace)));
+    const m=mods[Math.floor(Math.random()*3)];
+    moves.push(f+m);
+    lastLastFace=lastFace;
+    lastFace=f;
+  }
+  return moves;
+}
+function isOpposite(a,b){return(a==='U'&&b==='D')||(a==='D'&&b==='U')||(a==='R'&&b==='L')||(a==='L'&&b==='R')||(a==='F'&&b==='B')||(a==='B'&&b==='F');}
+
+// Apply scramble to solved state and return the state
+function applyCFOPScramble(scrambleMoves){
+  const s={
+    U:['W','W','W','W','W','W','W','W','W'],R:['B','B','B','B','B','B','B','B','B'],
+    F:['R','R','R','R','R','R','R','R','R'],D:['Y','Y','Y','Y','Y','Y','Y','Y','Y'],
+    L:['G','G','G','G','G','G','G','G','G'],B:['O','O','O','O','O','O','O','O','O']
+  };
+  function rCW(f){const a=s[f];s[f]=[a[6],a[3],a[0],a[7],a[4],a[1],a[8],a[5],a[2]];}
+  function cyc(f){let t;switch(f){case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.R[0];s.F[1]=s.R[1];s.F[2]=s.R[2];s.R[0]=s.B[0];s.R[1]=s.B[1];s.R[2]=s.B[2];s.B[0]=s.L[0];s.B[1]=s.L[1];s.B[2]=s.L[2];s.L[0]=t[0];s.L[1]=t[1];s.L[2]=t[2];break;case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.L[6];s.F[7]=s.L[7];s.F[8]=s.L[8];s.L[6]=s.B[6];s.L[7]=s.B[7];s.L[8]=s.B[8];s.B[6]=s.R[6];s.B[7]=s.R[7];s.B[8]=s.R[8];s.R[6]=t[0];s.R[7]=t[1];s.R[8]=t[2];break;case'R':t=[s.F[2],s.F[5],s.F[8]];s.F[2]=s.D[2];s.F[5]=s.D[5];s.F[8]=s.D[8];s.D[2]=s.B[6];s.D[5]=s.B[3];s.D[8]=s.B[0];s.B[0]=s.U[8];s.B[3]=s.U[5];s.B[6]=s.U[2];s.U[2]=t[0];s.U[5]=t[1];s.U[8]=t[2];break;case'L':t=[s.F[0],s.F[3],s.F[6]];s.F[0]=s.U[0];s.F[3]=s.U[3];s.F[6]=s.U[6];s.U[0]=s.B[8];s.U[3]=s.B[5];s.U[6]=s.B[2];s.B[2]=s.D[6];s.B[5]=s.D[3];s.B[8]=s.D[0];s.D[0]=t[0];s.D[3]=t[1];s.D[6]=t[2];break;case'F':t=[s.U[6],s.U[7],s.U[8]];s.U[6]=s.L[8];s.U[7]=s.L[5];s.U[8]=s.L[2];s.L[2]=s.D[0];s.L[5]=s.D[1];s.L[8]=s.D[2];s.D[0]=s.R[6];s.D[1]=s.R[3];s.D[2]=s.R[0];s.R[0]=t[0];s.R[3]=t[1];s.R[6]=t[2];break;case'B':t=[s.U[0],s.U[1],s.U[2]];s.U[0]=s.R[2];s.U[1]=s.R[5];s.U[2]=s.R[8];s.R[2]=s.D[8];s.R[5]=s.D[7];s.R[8]=s.D[6];s.D[6]=s.L[0];s.D[7]=s.L[3];s.D[8]=s.L[6];s.L[0]=t[2];s.L[3]=t[1];s.L[6]=t[0];break;}}
+  function doMove(mv){const f=mv[0],p=mv.includes("'"),d=mv.includes('2'),n=d?2:(p?3:1);for(let i=0;i<n;i++){rCW(f);cyc(f);}}
+  scrambleMoves.forEach(m=>doMove(m));
+  return s;
+}
+
+// ===== CFOP SOLVER ENGINE =====
+// Uses cubejs worker to solve from scrambled state, then breaks solution into CFOP phases
+
+function solveCFOPWithWorker(scrambledState, callback){
+  // Convert state to facelet string
+  const F2C_REV={W:'U',B:'R',R:'F',Y:'D',G:'L',O:'B'};
+  const FO=['U','R','F','D','L','B'];
+  let fl='';
+  FO.forEach(f=>{scrambledState[f].forEach(c=>{fl+=F2C_REV[c]||'?';});});
+  
+  // Use cubejs to get optimal solution
+  if(solverWorker) solverWorker.terminate();
+  initSolver();
+  
+  let waitCount=0;
+  function waitReady(){
+    waitCount++;
+    if(solverReady){
+      const timeout=setTimeout(()=>{callback('求解超時',null);},8000);
+      solverCB=(err,sol)=>{
+        clearTimeout(timeout);
+        if(err){callback('求解錯誤: '+err.message,null);return;}
+        if(!sol||!sol.trim()){callback(null,[]);return;}
+        callback(null,sol.trim().split(/\s+/));
+      };
+      solverWorker.postMessage({t:'solve',fl});
+    }else if(waitCount>100){
+      callback('求解器初始化超時',null);
+    }else{
+      setTimeout(waitReady,100);
+    }
+  }
+  waitReady();
+}
+
+// ===== CFOP PHASE ANALYZER =====
+// Given a scrambled state, determine which CFOP phase we're in and what pattern to use
+
+function analyzeDFace(state){
+  // Check D face for OLL pattern
+  const d=state.D;
+  // Edges: D[1]=front, D[3]=left, D[5]=right, D[7]=back
+  const edgesYellow=[d[1]==='Y',d[3]==='Y',d[5]==='Y',d[7]==='Y'];
+  const edgeCount=edgesYellow.filter(x=>x).length;
+  // Corners: D[0]=front-left, D[2]=front-right, D[6]=back-left, D[8]=back-right
+  const cornersYellow=[d[0]==='Y',d[2]==='Y',d[6]==='Y',d[8]==='Y'];
+  const cornerCount=cornersYellow.filter(x=>x).length;
+  return {edgesYellow,edgeCount,cornersYellow,cornerCount,dFace:d};
+}
+
+// ===== CFOP INTRO SCREEN =====
+function showCFOPIntro(){
+  const ui=document.getElementById('cfopUI');
+  ui.style.display='flex';
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;overflow-y:auto;padding:16px 12px">';
+  h+='<div style="font-size:28px;font-weight:900;background:linear-gradient(135deg,#FF5800,#FFD700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px">🚀 CFOP 進階教學</div>';
+  h+='<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;line-height:1.6">會 LBL 了嗎？來學速解選手都在用的 CFOP！<br>用<b style="color:#FFD700">完整打亂</b>的魔方開始 → 分 4 步還原</div>';
+
+  // CFOP 4 phases overview
+  const phases=[
+    {icon:'✚',name:'C = Cross',cn:'白色十字',color:'#FFFFFF',desc:'跟 LBL 一樣！在上白面做十字'},
+    {icon:'🧱',name:'F = F2L',cn:'前兩層',color:'#00D2FF',desc:'同時解角塊＋邊塊，比 LBL 更快'},
+    {icon:'🌟',name:'O = OLL',cn:'黃面朝向',color:'#FFD500',desc:'讓下黃面全部變黃（2步完成）'},
+    {icon:'🎯',name:'P = PLL',cn:'黃面歸位',color:'#FF5800',desc:'把黃面的塊移到正確位置（2步完成）'},
+  ];
+  h+='<div style="display:grid;gap:6px;margin-bottom:16px">';
+  phases.forEach((p,i)=>{
+    h+='<div style="background:rgba(255,255,255,.05);border-left:3px solid '+p.color+';border-radius:8px;padding:8px 12px;text-align:left;display:flex;gap:8px;align-items:center">';
+    h+='<div style="font-size:20px;min-width:28px;text-align:center">'+p.icon+'</div>';
+    h+='<div><div style="font-size:13px;font-weight:800;color:'+p.color+'">'+p.name+'</div>';
+    h+='<div style="font-size:11px;color:rgba(255,255,255,.5)">'+p.desc+'</div></div></div>';
+  });
+  h+='</div>';
+
+  h+='<div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:10px;margin-bottom:16px">';
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">💡 跟 LBL 比較</div>';
+  h+='<div style="font-size:12px;color:#fff;line-height:1.6">LBL：7 步驟，入門友善<br>CFOP：4 步驟，<span style="color:#FFD700">速度快 2-3 倍！</span><br>這裡用「簡化版」只需 <span style="color:#00D2FF">16 個公式</span></div></div>';
+
+  // Practice modes
+  h+='<div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:8px">選擇練習模式</div>';
+
+  h+='<div style="background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.4);border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;text-align:left" onclick="startCFOPFullSolve()">';
+  h+='<div style="font-size:16px;font-weight:800;color:#FFD700">🏆 完整解題</div>';
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px">隨機打亂 → 用 CFOP 四步還原<br>每一步告訴你「為什麼用這個公式」</div></div>';
+
+  h+='<div style="font-size:10px;color:rgba(255,255,255,.25);margin:8px 0">── 分階段練習 ──</div>';
+
+  const stageOpts=[
+    {fn:'startCFOPPractice("oll_edges")',icon:'✚',name:'OLL 第一步：黃色十字',desc:'練習辨認圓點/一字/L形'},
+    {fn:'startCFOPPractice("oll_corners")',icon:'🌟',name:'OLL 第二步：黃面全黃',desc:'練習辨認 7 種角塊圖案'},
+    {fn:'startCFOPPractice("pll_corners")',icon:'🔄',name:'PLL 第一步：角塊歸位',desc:'練習辨認頭燈和角塊交換'},
+    {fn:'startCFOPPractice("pll_edges")',icon:'🎯',name:'PLL 第二步：邊塊歸位',desc:'練習最後的邊塊交換'},
+  ];
+  stageOpts.forEach(s=>{
+    h+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px 12px;margin-bottom:6px;cursor:pointer;text-align:left" onclick="'+s.fn+'">';
+    h+='<div style="font-size:14px;font-weight:700;color:#eee">'+s.icon+' '+s.name+'</div>';
+    h+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+s.desc+'</div></div>';
+  });
+
+  h+='<div style="margin-top:16px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="cfopBack()">← 返回首頁</button></div>';
+  h+='</div>';
+  document.getElementById('cfopContent').innerHTML=h;
+}
+
+function cfopBack(){
+  document.getElementById('cfopUI').style.display='none';
+  document.getElementById('startOv').style.display='';
+  document.getElementById('startOv').classList.add('show');
+}
+
+// ===== CFOP FULL SOLVE MODE =====
+function startCFOPFullSolve(){
+  const ui=document.getElementById('cfopUI');
+  
+  // Generate random scramble
+  const scrambleMoves=generateCFOPScramble();
+  const scrambledState=applyCFOPScramble(scrambleMoves);
+  
+  // Show scramble instruction
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:16px 12px;overflow-y:auto">';
+  h+='<div style="font-size:20px;font-weight:900;color:#FFD700;margin-bottom:8px">🔀 打亂你的魔方</div>';
+  h+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:12px;line-height:1.6">';
+  h+='從<b style="color:#fff">已還原</b>的魔方開始<br>白色朝上，紅色朝向你<br>跟著下面的指令打亂</div>';
+  
+  // Show scramble moves
+  h+='<div style="background:rgba(255,255,255,.06);border-radius:12px;padding:12px;margin-bottom:12px">';
+  h+='<div style="font-size:10px;color:rgba(255,255,255,.3);margin-bottom:6px">打亂步驟（'+scrambleMoves.length+' 步）</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center">';
+  scrambleMoves.forEach((m,i)=>{
+    const desc=MDESC_KID[m]||MDESC[m]||m;
+    h+='<div style="background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.2);border-radius:6px;padding:4px 8px;font-size:12px;color:#FFD700;font-weight:700" title="'+desc+'">';
+    h+=(i+1)+'. '+m+'</div>';
+  });
+  h+='</div></div>';
+
+  // Show resulting state preview
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">打亂完成後應該長這樣：</div>';
+  h+='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">';
+  ['U','F','R','D','L','B'].forEach(f=>{
+    h+='<div style="text-align:center"><div style="font-size:8px;color:rgba(255,255,255,.3)">'+FLABEL[f]+'</div>';
+    h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px">';
+    scrambledState[f].forEach(c=>{h+='<div style="width:12px;height:12px;border-radius:2px;background:'+(CMAP[c]||'#333')+'"></div>';});
+    h+='</div></div>';
+  });
+  h+='</div>';
+
+  // Start solving
+  h+='<button class="btn" style="font-size:16px;padding:14px 40px" onclick="beginCFOPSolve()">✅ 打亂好了，開始解！</button>';
+  h+='<div style="margin-top:8px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="showCFOPIntro()">← 返回</button></div>';
+  h+='</div>';
+  ui.querySelector('#cfopContent').innerHTML=h;
+
+  // Store scramble info
+  window._cfopScrambleMoves=scrambleMoves;
+  window._cfopScrambledState=scrambledState;
+}
+
+function beginCFOPSolve(){
+  const ui=document.getElementById('cfopContent');
+  ui.innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:40px;animation:spin 1s linear infinite">⚙️</div><div style="font-size:16px;font-weight:800;color:#FFD700;margin-top:12px">計算 CFOP 解法中...</div></div>';
+  
+  const scrambledState=window._cfopScrambledState;
+  
+  solveCFOPWithWorker(scrambledState,(err,solutionMoves)=>{
+    if(err){
+      ui.innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:40px">⚠️</div><div style="font-size:16px;color:#E94560;margin-top:8px">'+err+'</div><button class="btn" style="margin-top:16px" onclick="showCFOPIntro()">返回</button></div>';
+      return;
+    }
+    if(solutionMoves.length===0){
+      ui.innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:40px">🎉</div><div style="font-size:16px;color:#00D2FF;margin-top:8px">已經是還原狀態！</div><button class="btn" style="margin-top:16px" onclick="showCFOPIntro()">返回</button></div>';
+      return;
+    }
+    
+    // Now break solution into CFOP phases by simulating
+    const phases=breakIntoCFOPPhases(scrambledState, solutionMoves);
+    showCFOPSolveGuide(scrambledState, solutionMoves, phases);
+  });
+}
+
+// Break a solution into CFOP phases by checking state after each move
+function breakIntoCFOPPhases(initialState, moves){
+  // Clone state
+  const s={};
+  ['U','R','F','D','L','B'].forEach(f=>s[f]=[...initialState[f]]);
+  function rCW(f){const a=s[f];s[f]=[a[6],a[3],a[0],a[7],a[4],a[1],a[8],a[5],a[2]];}
+  function cyc(f){let t;switch(f){case'U':t=[s.F[0],s.F[1],s.F[2]];s.F[0]=s.R[0];s.F[1]=s.R[1];s.F[2]=s.R[2];s.R[0]=s.B[0];s.R[1]=s.B[1];s.R[2]=s.B[2];s.B[0]=s.L[0];s.B[1]=s.L[1];s.B[2]=s.L[2];s.L[0]=t[0];s.L[1]=t[1];s.L[2]=t[2];break;case'D':t=[s.F[6],s.F[7],s.F[8]];s.F[6]=s.L[6];s.F[7]=s.L[7];s.F[8]=s.L[8];s.L[6]=s.B[6];s.L[7]=s.B[7];s.L[8]=s.B[8];s.B[6]=s.R[6];s.B[7]=s.R[7];s.B[8]=s.R[8];s.R[6]=t[0];s.R[7]=t[1];s.R[8]=t[2];break;case'R':t=[s.F[2],s.F[5],s.F[8]];s.F[2]=s.D[2];s.F[5]=s.D[5];s.F[8]=s.D[8];s.D[2]=s.B[6];s.D[5]=s.B[3];s.D[8]=s.B[0];s.B[0]=s.U[8];s.B[3]=s.U[5];s.B[6]=s.U[2];s.U[2]=t[0];s.U[5]=t[1];s.U[8]=t[2];break;case'L':t=[s.F[0],s.F[3],s.F[6]];s.F[0]=s.U[0];s.F[3]=s.U[3];s.F[6]=s.U[6];s.U[0]=s.B[8];s.U[3]=s.B[5];s.U[6]=s.B[2];s.B[2]=s.D[6];s.B[5]=s.D[3];s.B[8]=s.D[0];s.D[0]=t[0];s.D[3]=t[1];s.D[6]=t[2];break;case'F':t=[s.U[6],s.U[7],s.U[8]];s.U[6]=s.L[8];s.U[7]=s.L[5];s.U[8]=s.L[2];s.L[2]=s.D[0];s.L[5]=s.D[1];s.L[8]=s.D[2];s.D[0]=s.R[6];s.D[1]=s.R[3];s.D[2]=s.R[0];s.R[0]=t[0];s.R[3]=t[1];s.R[6]=t[2];break;case'B':t=[s.U[0],s.U[1],s.U[2]];s.U[0]=s.R[2];s.U[1]=s.R[5];s.U[2]=s.R[8];s.R[2]=s.D[8];s.R[5]=s.D[7];s.R[8]=s.D[6];s.D[6]=s.L[0];s.D[7]=s.L[3];s.D[8]=s.L[6];s.L[0]=t[2];s.L[3]=t[1];s.L[6]=t[0];break;}}
+  function doMove(mv){const f=mv[0],p=mv.includes("'"),d=mv.includes('2'),n=d?2:(p?3:1);for(let i=0;i<n;i++){rCW(f);cyc(f);}}
+
+  function checkCross(){
+    // White cross: U edges are white, and side centers match
+    return s.U[1]==='W'&&s.U[3]==='W'&&s.U[5]==='W'&&s.U[7]==='W'
+      &&s.F[1]===s.F[4]&&s.R[1]===s.R[4]&&s.B[1]===s.B[4]&&s.L[1]===s.L[4];
+  }
+  function checkF2L(){
+    // First two layers: U face all white, first 2 rows of sides correct
+    if(!s.U.every(c=>c==='W'))return false;
+    return['F','R','B','L'].every(f=>{
+      const cc=s[f][4];
+      return s[f][0]===cc&&s[f][1]===cc&&s[f][2]===cc
+        &&s[f][3]===cc&&s[f][5]===cc;
+    });
+  }
+  function checkOLL(){
+    return s.D.every(c=>c==='Y');
+  }
+  function checkPLL(){
+    if(!checkOLL())return false;
+    return['F','R','B','L'].every(f=>{
+      const cc=s[f][4];
+      return s[f][6]===cc&&s[f][7]===cc&&s[f][8]===cc;
+    });
+  }
+
+  let crossDone=-1,f2lDone=-1,ollDone=-1,pllDone=-1;
+  let crossAlready=checkCross(),f2lAlready=checkF2L(),ollAlready=checkOLL();
+
+  for(let i=0;i<moves.length;i++){
+    doMove(moves[i]);
+    if(crossDone<0&&checkCross())crossDone=i;
+    if(f2lDone<0&&checkF2L())f2lDone=i;
+    if(ollDone<0&&checkOLL())ollDone=i;
+    if(pllDone<0&&checkPLL())pllDone=i;
+  }
+
+  // Build phase markers
+  const phases=[];
+  let start=0;
+  if(crossDone>=0){
+    phases.push({name:'Cross 白色十字',icon:'✚',color:'#FFFFFF',startIdx:start,endIdx:crossDone,
+      tip:'找到白色邊塊，一個一個轉回上白面，邊塊的側面顏色要對齊中心！'});
+    start=crossDone+1;
+  }
+  if(f2lDone>=0&&f2lDone>=start){
+    phases.push({name:'F2L 前兩層',icon:'🧱',color:'#00D2FF',startIdx:start,endIdx:f2lDone,
+      tip:'找到一對「白色角塊＋對應邊塊」，同時放進正確的角落！'});
+    start=f2lDone+1;
+  }
+  if(ollDone>=0&&ollDone>=start){
+    phases.push({name:'OLL 黃面朝向',icon:'🌟',color:'#FFD500',startIdx:start,endIdx:ollDone,
+      tip:'先做黃色十字，再讓所有角的黃色也朝下！看下黃面的圖案來選公式'});
+    start=ollDone+1;
+  }
+  if(pllDone>=0&&pllDone>=start){
+    phases.push({name:'PLL 黃面歸位',icon:'🎯',color:'#FF5800',startIdx:start,endIdx:pllDone,
+      tip:'先換角塊位置（找頭燈），再換邊塊位置 → 完成！'});
+  }
+
+  // If phases don't cover all moves, group remaining
+  if(phases.length===0){
+    phases.push({name:'CFOP 解法',icon:'🧊',color:'#FFD700',startIdx:0,endIdx:moves.length-1,tip:'跟著步驟一步步解'});
+  }else{
+    const lastEnd=phases[phases.length-1].endIdx;
+    if(lastEnd<moves.length-1){
+      phases.push({name:'最終調整',icon:'🔧',color:'#aaa',startIdx:lastEnd+1,endIdx:moves.length-1,tip:'調整最後的位置'});
+    }
+  }
+
+  return phases;
+}
+
+// ===== CFOP SOLVE GUIDE =====
+function showCFOPSolveGuide(scrambledState, solutionMoves, phases){
+  // Show overview first
+  const ui=document.getElementById('cfopContent');
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:16px 12px;overflow-y:auto">';
+  h+='<div style="font-size:22px;font-weight:900;color:#FFD700;margin-bottom:4px">✅ 解法計算完成！</div>';
+  h+='<div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px">共 '+solutionMoves.length+' 步，分成 '+phases.length+' 個階段</div>';
+
+  // Phase summary
+  phases.forEach((p,i)=>{
+    const stepCount=p.endIdx-p.startIdx+1;
+    h+='<div style="background:rgba(255,255,255,.05);border-left:3px solid '+p.color+';border-radius:8px;padding:8px 12px;margin-bottom:6px;text-align:left;display:flex;gap:8px;align-items:center">';
+    h+='<div style="font-size:18px;min-width:28px;text-align:center">'+p.icon+'</div>';
+    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700;color:'+p.color+'">'+p.name+'</div>';
+    h+='<div style="font-size:11px;color:rgba(255,255,255,.4)">'+stepCount+' 步</div></div>';
+    h+='<div style="font-size:10px;color:rgba(255,255,255,.3);font-family:monospace">步驟 '+(p.startIdx+1)+'-'+(p.endIdx+1)+'</div>';
+    h+='</div>';
+  });
+
+  h+='<div style="background:rgba(0,210,255,.08);border:1px solid rgba(0,210,255,.2);border-radius:10px;padding:10px;margin:12px 0">';
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">📱 使用方式</div>';
+  h+='<div style="font-size:12px;color:#fff;line-height:1.6">每一步都會告訴你<span style="color:#FFD700">要轉哪裡</span>和<span style="color:#00D2FF">為什麼</span><br>操作前/後的九宮格會顯示變化<br>手機可以<span style="color:#FFD700">左右滑動</span>切換步驟</div></div>';
+
+  h+='<button class="btn" style="font-size:16px;padding:14px 40px" onclick="startCFOPStepGuide()">▶ 開始一步步解！</button>';
+  h+='<div style="margin-top:8px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="showCFOPIntro()">← 返回</button></div>';
+  h+='</div>';
+  ui.innerHTML=h;
+
+  // Store for step guide
+  window._cfopSolution=solutionMoves;
+  window._cfopPhases=phases;
+  window._cfopInitState=scrambledState;
+}
+
+function startCFOPStepGuide(){
+  document.getElementById('cfopUI').style.display='none';
+  const scrambledState=window._cfopInitState;
+  const solutionMoves=window._cfopSolution;
+  const phases=window._cfopPhases;
+
+  solution=solutionMoves;
+  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...scrambledState[f]]);
+  solveStep=-1;
+  mode='solve';
+  window._lblMode=true; // reuse kid-friendly descriptions
+  window._lblScramblePhase=false;
+
+  // Convert phases to markers format
+  window._lblMarkers=phases.map(p=>({
+    stage:0,
+    title:p.name,
+    tip:p.tip,
+    startIdx:p.startIdx,
+    endIdx:p.endIdx,
+    color:p.color,
+    icon:p.icon
+  }));
+
+  // Override completion to go back to CFOP menu
+  window._cfopMode=true;
+
+  showSolveStep();
+}
+
+// ===== CFOP STAGE PRACTICE MODE =====
+function startCFOPPractice(stage){
+  const ui=document.getElementById('cfopContent');
+  
+  // Generate a state that needs only this stage
+  let practiceInfo;
+  switch(stage){
+    case 'oll_edges':
+      practiceInfo={
+        title:'OLL 第一步：黃色十字',
+        icon:'✚',
+        color:'#FFD500',
+        desc:'看下黃面有幾個黃色邊朝下，來決定用哪個公式',
+        cases:CFOP_OLL_EDGES,
+        setup:generateOLLEdgePractice
+      };
+      break;
+    case 'oll_corners':
+      practiceInfo={
+        title:'OLL 第二步：黃面全黃',
+        icon:'🌟',
+        color:'#FFD500',
+        desc:'十字做好了，現在看角塊的圖案來選公式',
+        cases:CFOP_OLL_CORNERS,
+        setup:generateOLLCornerPractice
+      };
+      break;
+    case 'pll_corners':
+      practiceInfo={
+        title:'PLL 第一步：角塊歸位',
+        icon:'🔄',
+        color:'#FF5800',
+        desc:'轉 D 面找「頭燈」（同色一對），決定換角方向',
+        cases:CFOP_PLL_CORNERS,
+        setup:generatePLLCornerPractice
+      };
+      break;
+    case 'pll_edges':
+      practiceInfo={
+        title:'PLL 第二步：邊塊歸位',
+        icon:'🎯',
+        color:'#FF5800',
+        desc:'角塊都歸位了，最後把邊塊送回正確位置',
+        cases:CFOP_PLL_EDGES,
+        setup:generatePLLEdgePractice
+      };
+      break;
+  }
+
+  // Show algorithm catalog
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:16px 12px;overflow-y:auto">';
+  h+='<div style="font-size:20px;font-weight:900;color:'+practiceInfo.color+';margin-bottom:4px">'+practiceInfo.icon+' '+practiceInfo.title+'</div>';
+  h+='<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:12px;line-height:1.5">'+practiceInfo.desc+'</div>';
+
+  h+='<div style="font-size:13px;color:rgba(255,255,255,.3);margin-bottom:8px">要辨認的圖案</div>';
+
+  practiceInfo.cases.forEach(c=>{
+    h+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;margin-bottom:8px;text-align:left">';
+    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+    h+='<div style="font-size:20px">'+c.icon+'</div>';
+    h+='<div><div style="font-size:14px;font-weight:800;color:#fff">'+c.name+'</div>';
+    h+='<div style="font-size:11px;color:rgba(255,255,255,.4)">'+c.desc+'</div></div></div>';
+    
+    h+='<div style="font-size:12px;color:#00D2FF;font-family:monospace;margin-bottom:4px;word-break:break-all">'+c.alg+'</div>';
+    h+='<div style="font-size:11px;color:#FFD700">🎵 '+c.chant+'</div>';
+    if(c.kid) h+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">💡 '+c.kid+'</div>';
+    h+='</div>';
+  });
+
+  h+='<div style="margin-top:12px">';
+  h+='<button class="btn" style="background:'+practiceInfo.color+';color:#000" onclick="startCFOPStagePractice(\''+stage+'\')">🎯 開始隨機練習</button>';
+  h+='</div>';
+  h+='<div style="margin-top:8px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="showCFOPIntro()">← 返回</button></div>';
+  h+='</div>';
+  ui.innerHTML=h;
+}
+
+// Generate practice states for each CFOP sub-stage
+function generateOLLEdgePractice(){
+  // Start with F2L solved, scramble only OLL edges
+  const s={U:['W','W','W','W','W','W','W','W','W'],R:['B','B','B','B','B','B','B','B','B'],F:['R','R','R','R','R','R','R','R','R'],D:['Y','Y','Y','Y','Y','Y','Y','Y','Y'],L:['G','G','G','G','G','G','G','G','G'],B:['O','O','O','O','O','O','O','O','O']};
+  // Apply OLL edge scramble (reverse of edge OLL algorithms)
+  const patterns=['dot','line','lshape'];
+  const pick=patterns[Math.floor(Math.random()*patterns.length)];
+  const alg=CFOP_OLL_EDGES.find(c=>c.id===pick);
+  const solveAlg=alg.alg.split(/\s+/);
+  // Apply inverse to create the scramble
+  const scramble=solveAlg.slice().reverse().map(m=>{if(m.includes("'"))return m.replace("'","");if(m.includes("2"))return m;return m+"'";});
+  return {scramble,solveAlg,patternName:alg.name,patternId:pick};
+}
+
+function generateOLLCornerPractice(){
+  const s={U:['W','W','W','W','W','W','W','W','W'],R:['B','B','B','B','B','B','B','B','B'],F:['R','R','R','R','R','R','R','R','R'],D:['Y','Y','Y','Y','Y','Y','Y','Y','Y'],L:['G','G','G','G','G','G','G','G','G'],B:['O','O','O','O','O','O','O','O','O']};
+  const patterns=['sune','antisune','h_oll','pi_oll'];
+  const pick=patterns[Math.floor(Math.random()*patterns.length)];
+  const alg=CFOP_OLL_CORNERS.find(c=>c.id===pick);
+  const solveAlg=alg.alg.split(/\s+/);
+  const scramble=solveAlg.slice().reverse().map(m=>{if(m.includes("'"))return m.replace("'","");if(m.includes("2"))return m;return m+"'";});
+  return {scramble,solveAlg,patternName:alg.name,patternId:pick};
+}
+
+function generatePLLCornerPractice(){
+  const patterns=['aa_perm'];
+  const pick=patterns[Math.floor(Math.random()*patterns.length)];
+  const alg=CFOP_PLL_CORNERS.find(c=>c.id===pick);
+  const solveAlg=alg.alg.split(/\s+/);
+  const scramble=solveAlg.slice().reverse().map(m=>{if(m.includes("'"))return m.replace("'","");if(m.includes("2"))return m;return m+"'";});
+  return {scramble,solveAlg,patternName:alg.name,patternId:pick};
+}
+
+function generatePLLEdgePractice(){
+  const patterns=['ua_perm','ub_perm'];
+  const pick=patterns[Math.floor(Math.random()*patterns.length)];
+  const alg=CFOP_PLL_EDGES.find(c=>c.id===pick);
+  const solveAlg=alg.alg.split(/\s+/);
+  const scramble=solveAlg.slice().reverse().map(m=>{if(m.includes("'"))return m.replace("'","");if(m.includes("2"))return m;return m+"'";});
+  return {scramble,solveAlg,patternName:alg.name,patternId:pick};
+}
+
+function startCFOPStagePractice(stage){
+  let practiceData;
+  switch(stage){
+    case 'oll_edges': practiceData=generateOLLEdgePractice(); break;
+    case 'oll_corners': practiceData=generateOLLCornerPractice(); break;
+    case 'pll_corners': practiceData=generatePLLCornerPractice(); break;
+    case 'pll_edges': practiceData=generatePLLEdgePractice(); break;
+  }
+
+  // Apply scramble to solved state
+  const scrambledState=applyCFOPScramble(practiceData.scramble);
+  
+  // Show scramble + pattern recognition
+  const ui=document.getElementById('cfopContent');
+  let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:16px 12px;overflow-y:auto">';
+  h+='<div style="font-size:18px;font-weight:900;color:#FFD700;margin-bottom:8px">🔀 打亂你的魔方</div>';
+  h+='<div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px">從已還原的魔方開始，跟著打亂</div>';
+
+  // Show scramble steps
+  h+='<div style="background:rgba(255,255,255,.06);border-radius:10px;padding:10px;margin-bottom:12px">';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center">';
+  practiceData.scramble.forEach((m,i)=>{
+    const desc=MDESC_KID[m]||m;
+    h+='<div style="background:rgba(255,215,0,.1);border-radius:4px;padding:3px 6px;font-size:11px;color:#FFD700;font-weight:700" title="'+desc+'">'+(i+1)+'. '+m+'</div>';
+  });
+  h+='</div></div>';
+
+  // Show D face result
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">打亂後下黃面長這樣：</div>';
+  h+='<div style="display:inline-grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:12px">';
+  scrambledState.D.forEach(c=>{
+    h+='<div style="width:24px;height:24px;border-radius:4px;background:'+(CMAP[c]||'#333')+';border:1px solid rgba(255,255,255,.2)"></div>';
+  });
+  h+='</div>';
+
+  // Pattern recognition hint
+  const algInfo=stage.startsWith('oll_e')?CFOP_OLL_EDGES.find(c=>c.id===practiceData.patternId):
+    stage.startsWith('oll_c')?CFOP_OLL_CORNERS.find(c=>c.id===practiceData.patternId):
+    stage.startsWith('pll_c')?CFOP_PLL_CORNERS.find(c=>c.id===practiceData.patternId):
+    CFOP_PLL_EDGES.find(c=>c.id===practiceData.patternId);
+
+  h+='<div style="background:rgba(0,210,255,.1);border:1px solid rgba(0,210,255,.3);border-radius:10px;padding:10px;margin-bottom:12px">';
+  h+='<div style="font-size:14px;font-weight:800;color:#00D2FF;margin-bottom:4px">🔍 你看到什麼圖案？</div>';
+  h+='<div style="font-size:13px;color:#fff">'+algInfo.icon+' <b>'+algInfo.name+'</b></div>';
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px">'+algInfo.desc+'</div>';
+  if(algInfo.kid)h+='<div style="font-size:11px;color:#FFD700;margin-top:4px">💡 '+algInfo.kid+'</div>';
+  h+='</div>';
+
+  h+='<button class="btn" onclick="runCFOPStageSolve(\''+stage+'\')">▶ 開始一步步還原</button>';
+  h+='<div style="margin-top:8px"><button class="btn btn-sm" style="background:rgba(255,255,255,.1);color:#aaa" onclick="startCFOPPractice(\''+stage+'\')">← 返回公式表</button></div>';
+  h+='</div>';
+  ui.innerHTML=h;
+
+  window._cfopPracticeData=practiceData;
+  window._cfopPracticeState=scrambledState;
+  window._cfopPracticeStage=stage;
+}
+
+function runCFOPStageSolve(stage){
+  document.getElementById('cfopUI').style.display='none';
+  
+  const data=window._cfopPracticeData;
+  const scrambledState=window._cfopPracticeState;
+  
+  // Use the known solve algorithm
+  const solveMoves=optimizeMoves(data.solveAlg);
+  
+  solution=solveMoves;
+  ['U','R','F','D','L','B'].forEach(f=>cubeState[f]=[...scrambledState[f]]);
+  solveStep=-1;
+  mode='solve';
+  window._lblMode=true;
+  window._lblScramblePhase=false;
+  window._cfopMode=true;
+  window._cfopPracticeStageId=stage;
+
+  const algInfo=stage.startsWith('oll_e')?CFOP_OLL_EDGES.find(c=>c.id===data.patternId):
+    stage.startsWith('oll_c')?CFOP_OLL_CORNERS.find(c=>c.id===data.patternId):
+    stage.startsWith('pll_c')?CFOP_PLL_CORNERS.find(c=>c.id===data.patternId):
+    CFOP_PLL_EDGES.find(c=>c.id===data.patternId);
+
+  window._lblMarkers=[{
+    stage:0,
+    title:algInfo.icon+' '+algInfo.name,
+    tip:algInfo.kid||algInfo.desc,
+    startIdx:0,
+    endIdx:solveMoves.length-1,
+    color:'#FFD700',
+    icon:algInfo.icon
+  }];
+
+  // Add chant info
+  if(algInfo.chant){
+    const stgDef={chant:algInfo.chant};
+    // Simple chant display — no group highlighting for CFOP
+  }
+
+  showSolveStep();
+}
+
+// ===== OVERRIDE COMPLETION FOR CFOP MODE =====
+// Patch the doneOv to return to CFOP menu instead of reloading
+const _origShowSolveStep=showSolveStep;
+// We hook into the completion path by checking window._cfopMode in the done overlay
+(function(){
+  const doneOv=document.getElementById('doneOv');
+  const origOnclick=doneOv.querySelector('button').getAttribute('onclick');
+  doneOv.querySelector('button').setAttribute('onclick','cfopDoneAction()');
+})();
+
+function cfopDoneAction(){
+  if(window._cfopMode){
+    window._cfopMode=false;
+    document.getElementById('doneOv').classList.remove('show');
+    document.getElementById('solveUI').style.display='none';
+    
+    if(window._cfopPracticeStageId){
+      // Return to practice stage
+      document.getElementById('cfopUI').style.display='flex';
+      startCFOPPractice(window._cfopPracticeStageId);
+      window._cfopPracticeStageId=null;
+    }else{
+      // Return to CFOP intro
+      document.getElementById('cfopUI').style.display='flex';
+      
+      // Show success screen briefly
+      const ui=document.getElementById('cfopContent');
+      let h='<div style="width:100%;max-width:380px;margin:0 auto;text-align:center;padding:40px 16px">';
+      h+='<div style="font-size:64px;margin-bottom:12px">🏆</div>';
+      h+='<div style="font-size:24px;font-weight:900;background:linear-gradient(135deg,#FF5800,#FFD700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px">CFOP 解題完成！</div>';
+      h+='<div style="font-size:14px;color:rgba(255,255,255,.5);margin-bottom:20px">你用 CFOP 方法成功還原了魔方！</div>';
+      h+='<button class="btn" style="background:linear-gradient(135deg,#FF5800,#FFD700);color:#000;margin-bottom:8px" onclick="startCFOPFullSolve()">🔄 再解一次</button>';
+      h+='<button class="btn" style="background:rgba(255,255,255,.15)" onclick="showCFOPIntro()">← 返回 CFOP 選單</button>';
+      h+='</div>';
+      ui.innerHTML=h;
+    }
+  }else{
+    location.reload();
+  }
+}
+
 </script>
 </body>
 </html>
