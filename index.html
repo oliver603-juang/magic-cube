@@ -4252,13 +4252,13 @@ function showCFOPIntro(){
   h+='<div style="font-size:10px;color:rgba(255,255,255,.25);margin:8px 0">── 分階段練習 ──</div>';
 
   const stageOpts=[
-    {fn:'startCFOPPractice("oll_edges")',icon:'✚',name:'OLL 第一步：黃色十字',desc:'練習辨認圓點/一字/L形'},
-    {fn:'startCFOPPractice("oll_corners")',icon:'🌟',name:'OLL 第二步：黃面全黃',desc:'練習辨認 7 種角塊圖案'},
-    {fn:'startCFOPPractice("pll_corners")',icon:'🔄',name:'PLL 第一步：角塊歸位',desc:'練習辨認頭燈和角塊交換'},
-    {fn:'startCFOPPractice("pll_edges")',icon:'🎯',name:'PLL 第二步：邊塊歸位',desc:'練習最後的邊塊交換'},
+    {fn:'oll_edges',icon:'✚',name:'OLL 第一步：黃色十字',desc:'練習辨認圓點/一字/L形'},
+    {fn:'oll_corners',icon:'🌟',name:'OLL 第二步：黃面全黃',desc:'練習辨認 7 種角塊圖案'},
+    {fn:'pll_corners',icon:'🔄',name:'PLL 第一步：角塊歸位',desc:'練習辨認頭燈和角塊交換'},
+    {fn:'pll_edges',icon:'🎯',name:'PLL 第二步：邊塊歸位',desc:'練習最後的邊塊交換'},
   ];
   stageOpts.forEach(s=>{
-    h+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px 12px;margin-bottom:6px;cursor:pointer;text-align:left" onclick="'+s.fn+'">';
+    h+='<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px 12px;margin-bottom:6px;cursor:pointer;text-align:left" onclick="startCFOPPractice(\''+s.fn+'\')">';
     h+='<div style="font-size:14px;font-weight:700;color:#eee">'+s.icon+' '+s.name+'</div>';
     h+='<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">'+s.desc+'</div></div>';
   });
