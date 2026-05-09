@@ -3053,11 +3053,39 @@ function startLBLPractice(fromStage){
       if(m.includes("2"))return m;
       return m+"'";
     });
-    teachSteps.push({stage, title:'第'+stg.n+'關：'+stg.name, desc:stg.desc, formula:stg.formula, tip:stg.tip, moves:solveMvs});
+    teachSteps.push({stage, title:'第'+stg.n+'關：'+stg.name, desc:stg.desc, formula:stg.formula, tip:stg.tip, moves:optimizeMoves(solveMvs)});
   });
   
   // Show the scramble instruction first
   showLBLScrambleGuide(result.state, teachSteps, fromStage);
+}
+
+// Optimize move sequence: merge D D→D2, cancel D D'→nothing, etc.
+function optimizeMoves(mvs){
+  let arr=[...mvs];
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(let i=0;i<arr.length-1;i++){
+      const a=arr[i],b=arr[i+1];
+      if(a[0]!==b[0])continue; // different face
+      const face=a[0];
+      // Convert to quarter turns: X=1, X'=-1, X2=2
+      function toQ(m){if(m.includes('2'))return 2;if(m.includes("'"))return -1;return 1;}
+      function fromQ(f,q){q=((q%4)+4)%4;if(q===0)return null;if(q===1)return f;if(q===2)return f+'2';return f+"'";}
+      const qa=toQ(a),qb=toQ(b);
+      const sum=(qa+qb)%4;
+      const merged=fromQ(face,sum);
+      if(merged===null){
+        arr.splice(i,2); // cancel out
+      }else{
+        arr.splice(i,2,merged); // merge
+      }
+      changed=true;
+      break;
+    }
+  }
+  return arr;
 }
 
 // Item 1: Step-by-step scramble guide using the same solve UI (not a text wall)
@@ -3066,7 +3094,7 @@ function showLBLScrambleGuide(targetState, teachSteps, fromStage){
   const result=generateLBLScramble(fromStage);
   const allScrambleMoves=[];
   result.stageBreaks.forEach(b=>allScrambleMoves.push(...b.moves.trim().split(/\s+/)));
-  window._lblScrambleMoves=allScrambleMoves;
+  window._lblScrambleMoves=optimizeMoves(allScrambleMoves);
   window._lblTeachSteps=teachSteps;
   window._lblTargetState=targetState;
   window._lblFromStage=fromStage;
